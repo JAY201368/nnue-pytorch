@@ -1,3 +1,6 @@
+"""
+量化方式的定义
+"""
 from dataclasses import dataclass
 from typing import Callable, NotRequired, TypedDict, TYPE_CHECKING
 
@@ -8,6 +11,9 @@ if TYPE_CHECKING:
 
 
 class WeightClippingConfig(TypedDict):
+    """
+    权重裁剪配置
+    """
     params: list[torch.Tensor]
     min_weight: float
     max_weight: float

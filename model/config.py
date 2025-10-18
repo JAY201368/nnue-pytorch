@@ -1,3 +1,6 @@
+"""
+默认参数配置
+"""
 from dataclasses import dataclass
 
 

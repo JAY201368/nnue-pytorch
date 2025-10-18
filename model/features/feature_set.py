@@ -1,3 +1,4 @@
+# 特征集定义其部分(特征块)及其大小, 为每个特征提供初始的 PSQT 值, 并允许检索每个特征的因子(与给定真实特征对应的所有特征(真实或虚拟))
 import chess
 import torch
 
@@ -90,6 +91,9 @@ class FeatureSet:
         This method takes a feature idx and looks for the block that owns it.
         If it found the block it asks it to factorize the index, otherwise
         it throws and Exception. The idx must refer to a real feature.
+        输入一个真实特征索引, 返回其特征因子化后的所有索引
+        :param idx: real feature index
+        :return: all factorized feature index
         """
         offset = 0
         for feature in self.features:
@@ -113,9 +117,12 @@ class FeatureSet:
         indices = []
         real_offset = 0
         offset = 0
+        # 遍历feature set中的每个feature block
         for feature in self.features:
+            # 遍历每个feature block中的所有real_feature, 将其分解
             for i_real in range(feature.num_real_features):
                 i_fact = feature.get_feature_factors(i_real)
+                # 将分解后下标加入列表
                 indices.append([offset + i for i in i_fact])
             real_offset += feature.num_real_features
             offset += feature.num_features

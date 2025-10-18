@@ -21,7 +21,9 @@ def orient(is_white_pov: bool, sq: int) -> int:
 def halfka_idx(is_white_pov: bool, king_sq: int, sq: int, p: chess.Piece) -> int:
     p_idx = (p.piece_type - 1) * 2 + (p.color != is_white_pov)
     if p_idx == 11:
+        # 己方王和敌方王共用一个64格棋盘
         p_idx -= 1
+    # 64 * 64 * 11 = 45056维, 节省8%特征向量长度
     return orient(is_white_pov, sq) + p_idx * NUM_SQ + king_sq * NUM_PLANES_REAL
 
 
@@ -96,7 +98,7 @@ class FactorizedFeatures(FeatureBlock):
         k_idx = idx // NUM_PLANES_REAL
 
         if a_idx // NUM_SQ == 10 and k_idx != a_idx % NUM_SQ:
-            a_idx += NUM_SQ
+            a_idx += NUM_SQ  # 移动到真实的敌方王的棋盘
 
         return [idx, self.get_factor_base_feature("A") + a_idx]
 

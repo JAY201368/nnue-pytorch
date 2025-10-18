@@ -1,3 +1,4 @@
+# 创建在训练过程中收集的事件数据(训练损失、验证损失或 elo)的图表
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 import matplotlib.pyplot as plt

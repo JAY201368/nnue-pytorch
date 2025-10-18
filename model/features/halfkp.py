@@ -12,6 +12,9 @@ NUM_PLANES = NUM_SQ * NUM_PT + 1
 
 
 def orient(is_white_pov: bool, sq: int) -> int:
+    # white: sq -> sq
+    # black: sq -> 0b111111 ^ sq
+    # 中心对称(旋转)
     return (63 * (not is_white_pov)) ^ sq
 
 
@@ -29,6 +32,10 @@ class Features(FeatureBlock):
     def get_active_features(
         self, board: chess.Board
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        make feature tensor according to current board
+        :return: feature tensors of both two povs
+        """
         def piece_features(turn):
             indices = torch.zeros(NUM_PLANES * NUM_SQ)
             for sq, p in board.piece_map().items():
@@ -59,22 +66,26 @@ class FactorizedFeatures(FeatureBlock):
     def get_active_features(
         self, board: chess.Board
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        # 调用原始HalfKP特征集的get_active_features方法, 获得白方和黑方的HalfKP特征张量
         white, black = self.base.get_active_features(board)
 
         def piece_features(base, color):
-            indices = torch.zeros(NUM_SQ * 11)
+            indices = torch.zeros(NUM_SQ * 11)  # 创建大小为704的零张量, 对应HalfK(64) + P(640) = 704个虚拟特征
             piece_count = 0
             # P feature
             for sq, p in board.piece_map().items():
                 if p.piece_type == chess.KING:
                     continue
                 piece_count += 1
-                p_idx = (p.piece_type - 1) * 2 + (p.color != color)
-                indices[(p_idx + 1) * NUM_SQ + orient(color, sq)] = 1.0
+                p_idx = (p.piece_type - 1) * 2 + (p.color != color)  # pieceType index
+                indices[(p_idx + 1) * NUM_SQ + orient(color, sq)] = 1.0  # first 64 slots are reserved for HalfK
             # HalfK feature
+            # piece_count: 当前颜色方非王棋子的数量
             ksq = board.king(color)
             assert ksq is not None
             indices[orient(color, ksq)] = piece_count
+            # 将原始HalfKP特征(base)与虚拟特征(indices)拼接
+            # 最终张量大小：NUM_PLANES * NUM_SQ + NUM_SQ + NUM_SQ * 10 = 41024 + 64 + 640 = 41728
             return torch.cat((base, indices))
 
         return (piece_features(white, chess.WHITE), piece_features(black, chess.BLACK))
@@ -83,8 +94,8 @@ class FactorizedFeatures(FeatureBlock):
         if idx >= self.num_real_features:
             raise Exception("Feature must be real")
 
-        k_idx = idx // NUM_PLANES
-        p_idx = idx % NUM_PLANES - 1
+        k_idx = idx // NUM_PLANES  # idx // 641 -> king pos
+        p_idx = idx % NUM_PLANES - 1  # idx % 641 - 1 -> pieceType & piecePos
 
         return [
             idx,

@@ -1,3 +1,9 @@
+"""
+包含网络架构的定义并描述推理过程
+模型被定义为一个名为 NNUE 的 pl.LightningModule. 
+模型定义了推理过程并选择要优化的参数. 为了考虑量化, 它在每一步后将某些层的权重裁剪到支持的范围内. 训练循环由 pytorch-lightning 处理, 它通过模型的某些方法与模型对接. 
+模型还包含代码, 允许它在加载现有模型时在某些特征集之间进行转换. 值得注意的是, 在加载现有模型后, 可以添加虚拟特征. 模型模块还公开了一个函数, 用于将这些虚拟特征权重合并为真实特征权重. 
+"""
 from typing import Generator
 
 import torch
@@ -9,9 +15,12 @@ from .feature_transformer import DoubleFeatureTransformerSlice
 from .features import FeatureSet
 from .quantize import QuantizationConfig, QuantizationManager
 
-
+# 线性层类
 class StackedLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, count: int):
+        """
+        count -> 桶(并行计算的特征向量)的数量
+        """
         super().__init__()
 
         self.in_features = in_features
@@ -61,7 +70,6 @@ class StackedLinear(nn.Module):
 
         return layer
 
-
 class FactorizedStackedLinear(StackedLinear):
     def __init__(self, in_features: int, out_features: int, count: int):
         super().__init__(in_features, out_features, count)
@@ -73,6 +81,7 @@ class FactorizedStackedLinear(StackedLinear):
             self.factorized_linear.bias.zero_()
 
     def forward(self, x: Tensor, ls_indices: Tensor) -> Tensor:
+        # coalesce?
         merged_weight = self.linear.weight + self.factorized_linear.weight.repeat(
             self.count, 1
         )
@@ -93,6 +102,9 @@ class FactorizedStackedLinear(StackedLinear):
 
     @torch.no_grad()
     def coalesce_weights(self) -> None:
+        """
+        将虚拟特征对应的权重合并到真实特征上, 即将虚拟特征下标对应的权重行累加到真实特征下标对应的权重行
+        """
         for i in range(self.count):
             begin = i * self.out_features
             end = (i + 1) * self.out_features
@@ -103,9 +115,12 @@ class FactorizedStackedLinear(StackedLinear):
         self.factorized_linear.weight.zero_()
         self.factorized_linear.bias.zero_()
 
-
+# 浮点神经网络
 class LayerStacks(nn.Module):
     def __init__(self, count: int, config: ModelConfig):
+        """
+        count -> 桶(并行计算的特征向量)的数量
+        """
         super().__init__()
 
         self.count = count
@@ -117,9 +132,10 @@ class LayerStacks(nn.Module):
         # there's a non-linearity and factorization breaks.
         # This is by design. The weights in the further layers should be
         # able to diverge a lot.
-        self.l1 = FactorizedStackedLinear(2 * self.L1 // 2, self.L2 + 1, count)
-        self.l2 = StackedLinear(self.L2 * 2, self.L3, count)
-        self.output = StackedLinear(self.L3, 1, count)
+        # 每桶分得 L2 + 1 维首层输出, 其中 L2 走激活, +1 是直通项, 后面直接加到输出
+        self.l1 = FactorizedStackedLinear(2 * self.L1 // 2, self.L2 + 1, count)    # 奇数变偶数? 线性层l1: 3072 -> (15+1) * count
+        self.l2 = StackedLinear(self.L2 * 2, self.L3, count)  # count个L2池化成一个, fact单独保留(?), 最终剩下两倍L2的输入维数. 线性层l2: 15 * 2 -> 32 * count
+        self.output = StackedLinear(self.L3, 1, count)   # 输出层, 线性层output: 32 -> 1 * count
 
         with torch.no_grad():
             self.output.linear.bias.zero_()
@@ -154,7 +170,7 @@ class LayerStacks(nn.Module):
     def coalesce_layer_stacks_inplace(self) -> None:
         self.l1.coalesce_weights()
 
-
+# 整数网络
 class NNUEModel(nn.Module):
     def __init__(
         self,
@@ -233,6 +249,26 @@ class NNUEModel(nn.Module):
         """
         Clips the weights of the model based on the min/max values allowed
         by the quantization scheme.
+        根据量化准则, 缩放模型各层参数
+        准则对应init()中定义的剪裁配置列表weight_clipping
+        self.weight_clipping = [
+            {
+                "params": [self.layer_stacks.l1.weight],
+                "min_weight": -max_hidden_weight,
+                "max_weight": max_hidden_weight,
+                "virtual_params": self.layer_stacks.l1_fact.weight,
+            },
+            {
+                "params": [self.layer_stacks.l2.weight],
+                "min_weight": -max_hidden_weight,
+                "max_weight": max_hidden_weight,
+            },
+            {
+                "params": [self.layer_stacks.output.weight],
+                "min_weight": -max_out_weight,
+                "max_weight": max_out_weight,
+            },
+        ]
         """
         for group in self.weight_clipping:
             for p in group["params"]:
@@ -324,19 +360,28 @@ class NNUEModel(nn.Module):
         psqt_indices: Tensor,
         layer_stack_indices: Tensor,
     ):
-        wp, bp = self.input(white_indices, white_values, black_indices, black_values)
+        # wp, bp各自表示由DoubleFeatureTransformerSlice生成的两侧视角的稠密输入向量
+        # 形状均为[batch_size, L1 + num_psqt_buckets]
+        wp, bp = self.input(white_indices, white_values, black_indices, black_values)  # 黑白双方视角
+        # 分离主特征和PSQT输入
         w, wpsqt = torch.split(wp, self.L1, dim=1)
         b, bpsqt = torch.split(bp, self.L1, dim=1)
+        # 依据当前行动方权重融合两侧主特征, 己方和敌方使用不同加权
+        # torch.cat拼接张量, 加号作用为逐元素相加. 
         l0_ = (us * torch.cat([w, b], dim=1)) + (them * torch.cat([b, w], dim=1))
-        l0_ = torch.clamp(l0_, 0.0, 1.0)
+        l0_ = torch.clamp(l0_, 0.0, 1.0)  # 裁剪输入特征向量
 
-        l0_s = torch.split(l0_, self.L1 // 2, dim=1)
-        l0_s1 = [l0_s[0] * l0_s[1], l0_s[2] * l0_s[3]]
+        l0_s = torch.split(l0_, self.L1 // 2, dim=1)  # 将l0_按照每块L1//2切成四块
+        l0_s1 = [l0_s[0] * l0_s[1], l0_s[2] * l0_s[3]]  # 两两逐元素相乘, 再拼接为新的输入(池化)
         # We multiply by 127/128 because in the quantized network 1.0 is represented by 127
         # and it's more efficient to divide by 128 instead.
+        # 量化网络里1.0用127表示, 
+        # 用127/128做轻微缩放, 避免饱和并便于用移位近似除以128(?)
         l0_ = torch.cat(l0_s1, dim=1) * (127 / 128)
 
+        # 每个样本选择的PSQT桶索引. 本步操作将psqt_index从一行[B]变为一列[B][1]
         psqt_indices_unsq = psqt_indices.unsqueeze(dim=1)
+        # 根据psqt_indices列表选取psqt桶, 选择前形状为[B][num_psqt_buckets], 选择后形状变为[B][1]
         wpsqt = wpsqt.gather(1, psqt_indices_unsq)
         bpsqt = bpsqt.gather(1, psqt_indices_unsq)
         # The PSQT values are averaged over perspectives. "Their" perspective

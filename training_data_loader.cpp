@@ -1,3 +1,13 @@
+/**
+ * 处理加载训练数据(.bin, .binpack)并为批处理准备批次
+ * 由于性能要求, 必须以本地方式实现训练数据加载器. 数据加载器可以使用 compile_data_loader.bat 编译, 该脚本使用 cmake. 如果知道如何操作, 也可以在没有 cmake 的情况下进行编译. 
+ * 该组件实现了将棋盘状态分解为单个特征. 此步骤必须与在 Python 端定义的特征集一致. 
+ * 数据加载器一次提供整个批次, 以消除稍后将单个样本连接成批次的成本. SparseBatch 表示这样的批次. 它为样本的每个属性分配一个数组. 
+ * 活跃特征以(活跃特征索引, 活跃特征值)pair的形式存储. Pos对象中活跃特征的上限已知. 未使用的特征以索引 -1 存储. 
+ * 数据加载器支持多线程. 线程的数量可以在创建时指定, 并在读取磁盘数据的线程和形成批次的线程之间进行启发式分配. 
+ * 数据加载器还支持形成一个 fen 字符串数组, 而不是训练批次. 这对于其他工具非常有用, 例如 cross_check_eval.py. 
+ * 绑定是通过 nnue_dataset.py 组件中的 ctypes 完成的. 
+ */
 #include <iostream>
 #include <memory>
 #include <string>
@@ -93,17 +103,28 @@ struct HalfKP {
 
 struct HalfKPFactorized {
     // Factorized features
-    static constexpr int K_INPUTS = HalfKP::NUM_SQ;
-    static constexpr int PIECE_INPUTS = HalfKP::NUM_SQ * HalfKP::NUM_PT;
-    static constexpr int INPUTS = HalfKP::INPUTS + K_INPUTS + PIECE_INPUTS;
+    static constexpr int K_INPUTS = HalfKP::NUM_SQ;  // HalfK的维数
+    static constexpr int PIECE_INPUTS = HalfKP::NUM_SQ * HalfKP::NUM_PT;  // HalfP的维数(棋子类型数 * 格子数)
+    static constexpr int INPUTS = HalfKP::INPUTS + K_INPUTS + PIECE_INPUTS;  // 分解特征的维数为HalfKP(实特征), HalfK, HalfP的维数总和
 
-    static constexpr int MAX_K_FEATURES = 1;
-    static constexpr int MAX_PIECE_FEATURES = 32;
-    static constexpr int MAX_ACTIVE_FEATURES = HalfKP::MAX_ACTIVE_FEATURES + MAX_K_FEATURES + MAX_PIECE_FEATURES;
+    static constexpr int MAX_K_FEATURES = 1;  // 最多动一个王
+    static constexpr int MAX_PIECE_FEATURES = 32;  // 最多同时移动32个棋子(从无到有)
+    static constexpr int MAX_ACTIVE_FEATURES = HalfKP::MAX_ACTIVE_FEATURES + MAX_K_FEATURES + MAX_PIECE_FEATURES;  // 分解特征的最大活跃特征数为实特征和虚特征的...的总和
 
-    static std::pair<int, int> fill_features_sparse(const TrainingDataEntry& e, int* features, float* values, Color color)
+    /*
+     * 稀疏特征提取的核心函数, 主要作用是将棋盘位置转换为NNUE网络可以处理的稀疏特征表示
+    **/
+    static std::pair<int, int> fill_features_sparse(
+        const TrainingDataEntry& e,  // 训练数据条目, 包含棋盘位置信息
+        int* features,               // 输出数组, 存储活跃特征的索引
+        float* values,               // 输出数组, 存储活跃特征的值(1.0)
+        Color color                  // 当前视角的颜色(白方或黑方)
+    )
     {
+        // 填写实特征
         auto [start_j, offset] = HalfKP::fill_features_sparse(e, features, values, color);
+        
+        // 填写虚特征
         int j = start_j;
         auto& pos = e.pos;
         {
@@ -129,12 +150,12 @@ struct HalfKPFactorized {
             ++j;
         }
 
-        return { j, INPUTS };
+        return { j, INPUTS };  // 第一个元素是激活特征数量, 第二个元素是总特征空间大小
     }
 };
 
 struct HalfKA {
-    static constexpr int NUM_SQ = 64;
+    static constexpr int NUM_SQ = 64;  
     static constexpr int NUM_PT = 12;
     static constexpr int NUM_PLANES = (NUM_SQ * NUM_PT + 1);
     static constexpr int INPUTS = NUM_PLANES * NUM_SQ;
@@ -346,6 +367,9 @@ struct HalfKAv2_hmFactorized {
     }
 };
 
+/*
+ * 特征集抽象类
+**/
 template <typename T, typename... Ts>
 struct FeatureSet
 {
@@ -360,6 +384,9 @@ struct FeatureSet
     }
 };
 
+/*
+ * 一批训练数据的抽象类
+**/
 struct SparseBatch
 {
     static constexpr bool IS_BATCH = true;
@@ -367,18 +394,19 @@ struct SparseBatch
     template <typename... Ts>
     SparseBatch(FeatureSet<Ts...>, const std::vector<TrainingDataEntry>& entries)
     {
-        num_inputs = FeatureSet<Ts...>::INPUTS;
+        num_inputs = FeatureSet<Ts...>::INPUTS;  // 特征向量维数
         size = entries.size();
-        is_white = new float[size];
+        is_white = new float[size];  // 单批次内的训练数据是否为白色方 (为什么用float不用bool?)
         outcome = new float[size];
         score = new float[size];
-        white = new int[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];
+        white = new int[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];  // 白色方活跃特征下标
         black = new int[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];
-        white_values = new float[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];
+        white_values = new float[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];  // 白色方活跃特征值
         black_values = new float[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];
         psqt_indices = new int[size];
-        layer_stack_indices = new int[size];
+        layer_stack_indices = new int[size];  // 单个batch内每个数据取的bucket
 
+        // 初始化
         num_active_white_features = 0;
         num_active_black_features = 0;
         max_active_features = FeatureSet<Ts...>::MAX_ACTIVE_FEATURES;
@@ -429,6 +457,9 @@ struct SparseBatch
 
 private:
 
+    /*
+     * 填写单条训练数据的信息
+    **/
     template <typename... Ts>
     void fill_entry(FeatureSet<Ts...>, int i, const TrainingDataEntry& e)
     {
@@ -440,6 +471,9 @@ private:
         fill_features(FeatureSet<Ts...>{}, i, e);
     }
 
+    /*
+     * 填写活跃特征值, 记录活跃特征索引和数量
+    **/
     template <typename... Ts>
     void fill_features(FeatureSet<Ts...>, int i, const TrainingDataEntry& e)
     {
@@ -453,27 +487,42 @@ private:
     }
 };
 
+/*
+ * 一个最顶层的抽象基类, 唯一目的是提供一个虚析构函数 virtual ~AnyStream(), 确保能通过指向基类的指针正确析构派生类
+**/
 struct AnyStream
 {
     virtual ~AnyStream() = default;
 };
 
+/*
+ * 对 AnyStream 的一个具体化，但它本身仍然是一个抽象类, 定义了一个更具体的数据流应该是什么样的
+**/
 template <typename StorageT>
 struct Stream : AnyStream
 {
-    using StorageType = StorageT;
+    using StorageType = StorageT;  // 流产生的数据类型
 
     Stream(int concurrency, const std::vector<std::string>& filenames, bool cyclic, std::function<bool(const TrainingDataEntry&)> skipPredicate) :
         m_stream(training_data::open_sfen_input_file_parallel(concurrency, filenames, cyclic, skipPredicate))
     {
     }
 
+    /*
+     * 获取数据流的下一项
+     * 虚函数, 留给实现类定义具体行为
+    **/
     virtual StorageT* next() = 0;
 
 protected:
+    // 一个 std::unique_ptr，它指向一个真正负责从文件中读取原始数据的对象。
+    // unique_ptr 是一种智能指针，能自动管理内存，当 Stream 对象被销毁时，它指向的 BasicSfenInputStream 对象也会被自动销毁。
     std::unique_ptr<training_data::BasicSfenInputStream> m_stream;
 };
 
+/*
+ * 一个尝试实现异步数据获取的流
+**/
 template <typename StorageT>
 struct AsyncStream : Stream<StorageT>
 {
@@ -493,9 +542,22 @@ struct AsyncStream : Stream<StorageT>
     }
 
 protected:
+    // std::future: C++并发编程中的一个工具, 代表一个在未来某个时间点才能获得的结果
+    // next() 方法可能在返回当前数据块的同时，就在后台启动一个任务去加载下一个数据块，并将这个任务的 std::future 存放在 m_next 中。
+    // 这样，当你下次调用 next() 时，数据可能已经准备好了，从而减少了等待时间。
     std::future<StorageT*> m_next;
 };
 
+/*
+ * 创建一个名为 FeaturedBatchStream 的类。这个类的作用是：
+ * 从文件中并行读取原始训练数据（比如棋谱）。
+ * 使用多个后台工作线程将原始数据转换成“特征化”的数据（即模型可以理解的格式）。
+ * 将处理好的数据打包成一个个批次 (batch)。
+ * 主训练程序可以简单地调用 next() 方法来获取一个准备好的数据批次，而不需要等待文件读取和数据处理，从而大大提高了数据供给效率，避免 GPU/CPU 在训练时空闲。
+ * 这整个结构是一个经典的生产者-消费者模式 (Producer-Consumer Pattern)。
+ * 生产者：后台的工作线程 (m_workers)，它们负责读取文件、处理数据，并把生产好的数据批次（batch）放入一个队列（m_batches）。
+ * 消费者：调用 next() 方法的主线程，它从队列中取走已经准备好的数据批次。
+**/
 template <typename FeatureSetT, typename StorageT>
 struct FeaturedBatchStream : Stream<StorageT>
 {
@@ -510,7 +572,7 @@ struct FeaturedBatchStream : Stream<StorageT>
         BaseType(
             std::max(
                 1,
-                concurrency / num_feature_threads_per_reading_thread
+                concurrency / num_feature_threads_per_reading_thread  // 总并发线程数 / 单个读任务需要的线程数
             ),
             filenames,
             cyclic,
@@ -521,17 +583,19 @@ struct FeaturedBatchStream : Stream<StorageT>
     {
         m_stop_flag.store(false);
 
+        // 核心: 生产者逻辑
         auto worker = [this]()
         {
             std::vector<TrainingDataEntry> entries;
             entries.reserve(m_batch_size);
 
+            // 没有收到停止信号就一直加载数据
             while(!m_stop_flag.load())
             {
                 entries.clear();
 
                 {
-                    std::unique_lock lock(m_stream_mutex);
+                    std::unique_lock lock(m_stream_mutex);  // 给文件流加锁，因为多个线程不能同时读取同一个文件流，需要排队。
                     BaseType::m_stream->fill(entries, m_batch_size);
                     if (entries.empty())
                     {
@@ -625,6 +689,9 @@ private:
 };
 
 // Very simple fixed size string wrapper with a stable ABI to pass to python.
+/*
+ * 一个局面码字符串的封装类
+**/
 struct Fen
 {
     Fen() :
@@ -663,6 +730,9 @@ private:
     char* m_fen;
 };
 
+/*
+ * 一批局面码字符串的封装类
+**/
 struct FenBatch
 {
     FenBatch(const std::vector<TrainingDataEntry>& entries) :
@@ -685,6 +755,9 @@ private:
     Fen* m_fens;
 };
 
+/*
+ * 局面码流(黑魔法)
+**/
 struct FenBatchStream : Stream<FenBatch>
 {
     static constexpr int num_feature_threads_per_reading_thread = 2;
@@ -818,6 +891,9 @@ struct DataloaderSkipConfig {
     int param_index;
 };
 
+/*
+ * 决定是否跳过某局面的谓词函数
+**/
 std::function<bool(const TrainingDataEntry&)> make_skip_predicate(DataloaderSkipConfig config)
 {
     if (config.filtered || config.random_fen_skipping || config.wld_filtered || config.early_fen_skipping)
@@ -943,6 +1019,9 @@ std::function<bool(const TrainingDataEntry&)> make_skip_predicate(DataloaderSkip
 
 extern "C" {
 
+    /*
+     * 使用局面码构造训练批次
+    **/
     EXPORT SparseBatch* get_sparse_batch_from_fens(
         const char* feature_set_c,
         int num_fens,
@@ -956,8 +1035,8 @@ extern "C" {
         entries.reserve(num_fens);
         for (int i = 0; i < num_fens; ++i)
         {
-            auto& e = entries.emplace_back();
-            e.pos = Position::fromFen(fens[i]);
+            auto& e = entries.emplace_back();    // 构造TrainingDataEntry对象
+            e.pos = Position::fromFen(fens[i]);  // 用局面码还原出pos对象
             movegen::forEachLegalMove(e.pos, [&](Move m){e.move = m;});
             e.score = scores[i];
             e.ply = plies[i];

@@ -1,3 +1,4 @@
+# 第一层(与稀疏输入完全连接)的高度优化的 CUDA 实现
 import math
 
 import torch
@@ -580,8 +581,8 @@ class BaseFeatureTransformerSlice(nn.Module):
         self.num_inputs = num_inputs
         self.num_outputs = num_outputs
 
-        sigma = math.sqrt(1 / num_inputs)
-
+        sigma = math.sqrt(1 / num_inputs) # 防止线性变换中加起来之后值过大
+        # 将初始值限制在[-sigma, sigma)之间
         self.weight = nn.Parameter(
             torch.rand(num_inputs, num_outputs, dtype=torch.float32) * (2 * sigma)
             - sigma

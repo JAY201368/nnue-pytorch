@@ -10,7 +10,7 @@ NUM_PT_REAL = 11
 NUM_PT_VIRTUAL = 12
 NUM_PLANES_REAL = NUM_SQ * NUM_PT_REAL
 NUM_PLANES_VIRTUAL = NUM_SQ * NUM_PT_VIRTUAL
-NUM_INPUTS = NUM_PLANES_REAL * NUM_SQ // 2
+NUM_INPUTS = NUM_PLANES_REAL * NUM_SQ // 2  # 王位经过镜像只剩一半, 缩减50%特征向量长度
 
 # fmt: off
 KingBuckets = [
@@ -103,7 +103,7 @@ class FactorizedFeatures(FeatureBlock):
         k_idx = idx // NUM_PLANES_REAL
 
         if a_idx // NUM_SQ == 10 and k_idx != KingBuckets[a_idx % NUM_SQ]:
-            a_idx += NUM_SQ
+            a_idx += NUM_SQ  # 移动到真实的敌方王的64格棋盘
 
         return [idx, self.get_factor_base_feature("A") + a_idx]
 

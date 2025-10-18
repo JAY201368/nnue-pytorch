@@ -1,3 +1,10 @@
+"""
+一个实用脚本, 用于检查使用.nnue 模型的 pytorch 模型评估与 stockfish 玩家评估之间的对应关系
+对同一批输入局面(FEN), 
+一边用“外部引擎”(如Stockfish, 加载指定的.nnue权重)做NNUE前向, 得到引擎的评估值; 
+另一边用本地的 PyTorch/本仓库模型做前向, 得到本地评估值, 然后对两者做对比(如相关系数). 
+这样可检验实现与前处理是否一致, 以及数值是否对齐. 
+"""
 import argparse
 import subprocess
 import re
@@ -78,7 +85,7 @@ re_nnue_eval = re.compile(r"NNUE evaluation:?\s*?([-+]?\d*?\.\d*)")
 
 def compute_basic_eval_stats(evals):
     min_engine_eval = min(evals)
-    max_engine_eval = max(evals)
+    max_engine_\eval = max(evals)
     avg_engine_eval = sum(evals) / len(evals)
     avg_abs_engine_eval = sum(abs(v) for v in evals) / len(evals)
 
@@ -133,7 +140,7 @@ def compute_correlation(engine_evals, model_evals):
     print("Max difference: {}".format(max_diff))
 
 
-def eval_engine_batch(engine_path, net_path, fens):
+d ef eval_engine_batch(engine_path, net_path, fens):
     engine = subprocess.Popen(
         [engine_path],
         stdin=subprocess.PIPE,

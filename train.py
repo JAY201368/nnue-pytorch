@@ -1,3 +1,11 @@
+"""
+该组件是训练过程的入口点. 它识别用于训练的设备, 组装训练参数, 创建初始模型(或加载已存在的模型), 创建数据加载器(并定义纪元大小), 设置 tensorboard 记录器, 并启动训练过程. 
+要查看可用的调用参数, 可以运行 python train.py --help. 
+在这个训练器中, epoch 的概念与通常的定义略有不同, 这里我们将一个 epoch 定义为 1 亿个样本. 这是因为训练数据集的大小可能会有很大差异. 
+训练过程是无限的, 除非另有说明(--max_epochs). 检查点以.ckpt 格式保存在指定的日志目录中(请参见调用参数). 
+何时以及保存哪些检查点可以通过更改传递给 pl.callbacks.ModelCheckpoint 的参数来修改. 
+单个.ckpt 格式的检查点同时存储模型和优化器的状态, 因此它们的体积相当大, 建议每隔几个epoch才保存一次. 
+"""
 import argparse
 import time
 import warnings
@@ -70,7 +78,7 @@ def make_data_loaders(
     # it currently cannot work in parallel mode but it shouldn't need to
     train = DataLoader(
         data_loader.FixedNumBatchesDataset(
-            train_infinite, (epoch_size + batch_size - 1) // batch_size
+            train_infinite, (epoch_size + batch_size - 1) // batch_size  # 批次数向上取整
         ),
         batch_size=None,
         batch_sampler=None,
@@ -101,6 +109,7 @@ def flatten_once(lst):
 
 
 def main():
+    # 参数解析
     parser = argparse.ArgumentParser(description="Trains the network.")
     parser.add_argument(
         "datasets",
@@ -337,6 +346,7 @@ def main():
     M.add_feature_args(parser)
     args = parser.parse_args()
 
+    # 参数加载与检查
     args.datasets = flatten_once(args.datasets)
     if args.validation_datasets:
         args.validation_datasets = flatten_once(args.validation_datasets)
@@ -383,6 +393,7 @@ def main():
 
     max_epoch = args.max_epochs or 800
     if args.resume_from_model is None:
+        # 新建一个NNUE模块开始训练
         nnue = M.NNUE(
             feature_set=feature_set,
             loss_params=loss_params,
@@ -395,6 +406,7 @@ def main():
             quantize_config=M.QuantizationConfig(),
         )
     else:
+        # 加载已有的模型
         assert os.path.exists(args.resume_from_model)
         try:
             nnue = torch.load(args.resume_from_model, weights_only=False)
@@ -440,6 +452,7 @@ def main():
 
     print("Using log dir {}".format(tb_logger.log_dir), flush=True)
 
+    # 保存检查点的回调函数
     checkpoint_callback = ModelCheckpoint(
         save_last=args.save_last_network,
         every_n_epochs=args.network_save_period,

@@ -1,3 +1,4 @@
+# 提供一种使用 c-chess-cli 运行游戏的方法, 适用于随着训练进展而生成的网络
 import re
 import os
 import subprocess

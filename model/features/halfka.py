@@ -12,10 +12,14 @@ NUM_PLANES = NUM_SQ * NUM_PT + 1
 
 
 def orient(is_white_pov: bool, sq: int | chess.Square) -> int:
+    # 56 = 0b111000
+    # 只镜像一部分(高三位)?
+    # 对称变换(关于横中轴镜像)
     return (56 * (not is_white_pov)) ^ sq
 
 
 def halfka_idx(is_white_pov: bool, king_sq: int, sq: int, p: chess.Piece):
+    # 49216维向量, idx ∈ [1, 49216]
     p_idx = (p.piece_type - 1) * 2 + (p.color != is_white_pov)
     return 1 + orient(is_white_pov, sq) + p_idx * NUM_SQ + king_sq * NUM_PLANES
 

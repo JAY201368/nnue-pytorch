@@ -1,3 +1,4 @@
+# 根据或多或少的 Elo 评分删除最差的网络
 import sys
 import re
 import os

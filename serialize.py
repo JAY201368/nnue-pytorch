@@ -1,3 +1,13 @@
+"""
+处理在 model.py 中定义的模型的序列化/反序列化以及.nnue、.pt、.ckpt 序列化模型之间的转换
+虽然该组件被训练器用于加载现有模型, 但它也可以作为独立脚本用于模型格式之间的转换. 
+
+在对局引擎可用之前, 有必要将网络转换为.nnue 格式. 它支持以下格式之间的转换：
+- .nnue - 对局引擎使用的格式. 它以量化形式包含网络, 并不保留优化器状态. 
+- .pt - pytorch 的格式. 它不保留优化器状态, 因此在尝试重新启动训练并更改优化器时非常有用. 它使用全精度存储网络. 
+- .ckpt - 检查点存储的格式. 只有 .ckpt 格式的网络是由训练器生成的. 以这种方式保存的网络包含完整的优化器状态和训练器的状态, 例如当前的训练轮次. 此格式在暂时暂停训练时非常有用. 
+序列化器与模型紧密耦合. 对模型的更改通常需要相应地更改序列化器. 此外, 只有序列化器知道如何在转换为 .nnue 格式时执行量化, 并且它必须与播放引擎中的量化实现相对应. 
+"""
 import argparse
 import hashlib
 import os
@@ -120,7 +130,7 @@ def main():
 
         if not args.source.endswith(".nnue"):
             M.coalesce_ft_weights_inplace(nnue.model.feature_set, nnue.model.input)
-            nnue.model.layer_stacks.coalesce_layer_stacks_inplace()
+            nnue.model.layer_stacks.coalesce_layer_stacks_inplace()  # 重要: 将虚特征合并到实特征, 生成最终用于对局的第一层全连接层的权重矩阵!
 
         ftperm.ft_permute(nnue.model, args.ft_perm)
 
