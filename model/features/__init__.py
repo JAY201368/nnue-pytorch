@@ -19,7 +19,7 @@ _feature_blocks_by_name: dict[str, FeatureBlock] = dict()
 
 
 def _add_feature_block(feature_block_cls: Callable[[], FeatureBlock]) -> None:
-    feature_block = feature_block_cls()
+    feature_block = feature_block_cls()  # constructor?
     _feature_blocks_by_name[feature_block.name] = feature_block
 
 

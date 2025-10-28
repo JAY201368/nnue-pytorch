@@ -1,46 +1,88 @@
 from collections import OrderedDict
 
-import chess
+import chess  # TODO: handcraft our own chess lib
 import torch
 
 from .feature_block import FeatureBlock
 
+RANKS = 9  # 9行
+FILES = 7  # 7列
+NUM_SQ = FILES * RANKS  # 63格
+NUM_PT = 16  # 双方各8种
+NUM_PLANES = NUM_SQ * NUM_PT + 1  # 1009
+NUM_ATTACK_BUCKETS = 8  # 攻击桶数量
 
-NUM_SQ = 64
-NUM_PT = 12
-NUM_PLANES = NUM_SQ * NUM_PT + 1
 
-
-def orient(is_white_pov: bool, sq: int | chess.Square) -> int:
+def orient(
+        is_white_pov: bool,
+        sq: int | chess.Square
+) -> int:
     # 56 = 0b111000
-    # 只镜像一部分(高三位)?
     # 对称变换(关于横中轴镜像)
-    return (56 * (not is_white_pov)) ^ sq
+    # 原写法
+    # return (56 * (not is_white_pov)) ^ sq
+    # 原写法等效
+    # if is_white_pov:
+    #     return sq
+    # else:
+    #     return 56 ^ sq
+    # 改为斗兽棋
+    if is_white_pov:
+        return sq
+    rank = sq // FILES
+    file = sq % FILES
+    flipped_rank = RANKS - 1 - rank
+    return flipped_rank * FILES + file
 
+def halfaa_idx(
+        is_white_pov: bool,
+        # king_sq: int,  不再需要王位
+        sq: int,
+        p: chess.Piece,
+        attack_bucket: int
+):
+    """
+    定位棋子 + 位置在特征向量中的索引
+    """
+    # 白方偶数, 黑方奇数
+    p_idx = (p.piece_type - 1) * 2 if p.color == is_white_pov else (p.piece_type - 1) * 2 + 1
+    # 王不动, 删除王桶, 改为用攻击桶
+    return 1 + orient(is_white_pov, sq) + p_idx * NUM_SQ + attack_bucket * NUM_PLANES
 
-def halfka_idx(is_white_pov: bool, king_sq: int, sq: int, p: chess.Piece):
-    # 49216维向量, idx ∈ [1, 49216]
-    p_idx = (p.piece_type - 1) * 2 + (p.color != is_white_pov)
-    return 1 + orient(is_white_pov, sq) + p_idx * NUM_SQ + king_sq * NUM_PLANES
+def classify_attack_bucket(board: chess.Board) -> int:
+    # TODO: classify attack buckets
+    return 0
 
-
-def halfka_psqts():
+def halfaa_psqts():
+    """
+    填写psqt值
+    """
     # values copied from stockfish, in stockfish internal units
     piece_values = {
-        chess.PAWN: 126,
-        chess.KNIGHT: 781,
-        chess.BISHOP: 825,
-        chess.ROOK: 1276,
-        chess.QUEEN: 2538,
+        # chess.PAWN: 126,
+        # chess.KNIGHT: 781,
+        # chess.BISHOP: 825,
+        # chess.ROOK: 1276,
+        # chess.QUEEN: 2538,
+        # TODO: fill up piece-square table values
+        chess.ELEPHANT: 0,
+        chess.WOLF: 0,
+        chess.CHEETAH: 0,
+        chess.MOUSE: 0,
+        chess.CAT: 0,
+        chess.DOG: 0,
+        chess.TIGER: 0,
+        chess.LION: 0,
     }
 
-    values = [0] * (NUM_PLANES * NUM_SQ)
+    values = [0] * (NUM_PLANES * NUM_ATTACK_BUCKETS)
 
-    for ksq in range(64):
-        for s in range(64):
+    # for ksq in range(64):
+    for attack_bucket in range(NUM_ATTACK_BUCKETS):
+        for s in range(NUM_SQ):
             for pt, val in piece_values.items():
-                idxw = halfka_idx(True, ksq, s, chess.Piece(pt, chess.WHITE))
-                idxb = halfka_idx(True, ksq, s, chess.Piece(pt, chess.BLACK))
+                idxw = halfaa_idx(True, s, chess.Piece(pt, chess.WHITE), attack_bucket)
+                idxb = halfaa_idx(True, s, chess.Piece(pt, chess.BLACK), attack_bucket)
                 values[idxw] = val
                 values[idxb] = -val
 
@@ -50,32 +92,37 @@ def halfka_psqts():
 class Features(FeatureBlock):
     def __init__(self):
         super().__init__(
-            "HalfKA", 0x5F134CB8, OrderedDict([("HalfKA", NUM_PLANES * NUM_SQ)])
+            "HalfAA", 0x5F134CB8, OrderedDict([("HalfAA", NUM_PLANES * NUM_ATTACK_BUCKETS)])
         )
 
     def get_active_features(
         self, board: chess.Board
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        接收棋盘
+        返回黑白两个视角的特征向量
+        """
         def piece_features(turn):
-            indices = torch.zeros(NUM_PLANES * NUM_SQ)
-            ksq = board.king(turn)
-            assert ksq is not None
+            indices = torch.zeros(NUM_PLANES)
+            # ksq = board.king(turn)
+            # assert ksq is not None
+            attack_bucket = classify_attack_bucket(board)
             for sq, p in board.piece_map().items():
-                indices[halfka_idx(turn, orient(turn, ksq), sq, p)] = 1.0
+                indices[halfaa_idx(turn, sq, p, attack_bucket)] = 1.0
             return indices
 
-        return (piece_features(chess.WHITE), piece_features(chess.BLACK))
+        return piece_features(chess.WHITE), piece_features(chess.BLACK)
 
     def get_initial_psqt_features(self) -> list[int]:
-        return halfka_psqts()
+        return halfaa_psqts()
 
 
 class FactorizedFeatures(FeatureBlock):
     def __init__(self):
         super().__init__(
-            "HalfKA^",
+            "HalfAA^",
             0x5F134CB8,
-            OrderedDict([("HalfKA", NUM_PLANES * NUM_SQ), ("A", NUM_SQ * NUM_PT)]),
+            OrderedDict([("HalfAA", NUM_PLANES * NUM_ATTACK_BUCKETS), ("A", NUM_SQ * NUM_PT)]),
         )
 
     def get_active_features(self, board: chess.Board):
@@ -92,7 +139,7 @@ class FactorizedFeatures(FeatureBlock):
         return [idx, self.get_factor_base_feature("A") + a_idx]
 
     def get_initial_psqt_features(self) -> list[int]:
-        return halfka_psqts() + [0] * (NUM_SQ * NUM_PT)
+        return halfaa_psqts() + [0] * (NUM_SQ * NUM_PT)
 
 
 """

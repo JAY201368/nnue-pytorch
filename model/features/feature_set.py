@@ -1,5 +1,5 @@
-# 特征集定义其部分(特征块)及其大小, 为每个特征提供初始的 PSQT 值, 并允许检索每个特征的因子(与给定真实特征对应的所有特征(真实或虚拟))
-import chess
+# 特征集定义其部分(特征块)及其大小, 为每个特征提供初始的 PSQT 值, 并允许检索每个特征的因子(与给定实特征对应的所有特征索引)
+import chess  # 需要仿制斗兽棋的棋盘类
 import torch
 
 from .feature_block import FeatureBlock
@@ -10,19 +10,22 @@ def _calculate_features_hash(features):
         return features[0].hash
 
     tail_hash = _calculate_features_hash(features[1:])
-    return features[0].hash ^ (tail_hash << 1) ^ (tail_hash >> 1) & 0xFFFFFFFF
+    return features[0].hash ^ (tail_hash << 1) ^ (tail_hash >> 1) & 0xFFFFFFFF  # 何意味
 
 
 class FeatureSet:
     """
     A feature set is nothing more than a list of named FeatureBlocks.
-    It itself functions similarily to a feature block, but we don't want to be
+    It itself functions similarly to a feature block, but we don't want to be
     explicit about it as we don't want it to be used as a building block for other
     feature sets. You can think of this class as a composite, but not the full extent.
     It is basically a concatenation of feature blocks.
     """
 
-    def __init__(self, features):
+    def __init__(
+            self,
+            features  # List of feature blocks
+    ):
         for feature in features:
             if not isinstance(feature, FeatureBlock):
                 raise Exception("All features must subclass FeatureBlock")
@@ -55,6 +58,9 @@ class FeatureSet:
         return ranges
 
     def get_real_feature_ranges(self) -> list[tuple[int, int]]:
+        """
+        返回一个列表, 列表元素为每个特征块的实特征在特征向量中的下标范围
+        """
         ranges = []
         offset = 0
         for feature in self.features:
@@ -64,13 +70,15 @@ class FeatureSet:
         return ranges
 
     def get_active_features(
-        self, board: chess.Board
+        self,
+        board: chess.Board
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        This method goes over all of the feature blocks and gathers the active features.
+        This method goes over all the feature blocks and gathers the active features.
         Each block has its own index space assigned so the features from two different
         blocks will never have the same index here. Basically the thing you would expect
         to happen after concatenating many feature blocks.
+        根据棋盘状态, 得到特征张量(由各特征块的特征张量拼接而成)
         """
         w = torch.zeros(0)
         b = torch.zeros(0)
@@ -86,12 +94,15 @@ class FeatureSet:
 
         return w, b
 
-    def get_feature_factors(self, idx: int) -> list[int]:
+    def get_feature_factors(
+            self,
+            idx: int  # 实特征索引
+    ) -> list[int]:
         """
         This method takes a feature idx and looks for the block that owns it.
         If it found the block it asks it to factorize the index, otherwise
         it throws and Exception. The idx must refer to a real feature.
-        输入一个真实特征索引, 返回其特征因子化后的所有索引
+        输入一个实特征索引, 返回其所有因子化特征索引
         :param idx: real feature index
         :return: all factorized feature index
         """
@@ -109,7 +120,7 @@ class FeatureSet:
         valid features at the same time. It returns a list of length
         self.num_real_features with ith element being a list of factors
         of the ith feature.
-        This method is technically redundant but it allows to perform the operation
+        This method is technically redundant, but it allows to perform the operation
         slightly faster when there's many feature blocks. It might be worth
         to add a similar method to the FeatureBlock itself - to make it faster
         for feature blocks with many factors.

@@ -1,3 +1,4 @@
+# 单个特征的抽象类
 from collections import OrderedDict
 
 
@@ -49,16 +50,21 @@ class FeatureBlock:
     that are active for this board.
     """
 
-    def __init__(self, name: str, hash: int, factors: OrderedDict[str, int]):
+    def __init__(
+            self,
+            name: str,
+            hash: int,
+            factors: OrderedDict[str, int]  # [name, dimensions]
+    ):
         if not isinstance(factors, OrderedDict):
             raise Exception("Factors must be an collections.OrderedDict")
 
         self.name = name
-        self.hash = hash
+        self.hash = hash    # 哈希表大小?
         self.factors = factors
-        self.num_real_features = factors[_get_main_factor_name(name)]
-        self.num_features = sum(v for n, v in factors.items())
-        self.num_virtual_features = self.num_features - self.num_real_features
+        self.num_real_features = factors[_get_main_factor_name(name)]  # 实特征名称
+        self.num_features = sum(v for n, v in factors.items())         # 虚实特征维度总和
+        self.num_virtual_features = self.num_features - self.num_real_features  # 虚特征维度
 
     def get_main_factor_name(self) -> str:
         return _get_main_factor_name(self.name)
@@ -68,6 +74,7 @@ class FeatureBlock:
         This method represents the default factorizer. If your feature block
         has multiple factors you need to override this method to return
         a list of factors for a given feature.
+        根据活跃实特征定位活跃虚特征
         """
         return [idx]
 
@@ -75,6 +82,7 @@ class FeatureBlock:
         """
         This method takes a string name of a factor and returns the offset of the
         first feature in this factor when consulted with the sizes of the previous factors.
+        返回某因子的特征区域在整个特征向量中的起始偏移
         """
         offset = 0
         for n, s in self.factors.items():
