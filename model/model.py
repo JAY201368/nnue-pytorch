@@ -10,7 +10,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 
-from .config import ModelConfig
+from .config import ModelConfigssJe
 from .feature_transformer import DoubleFeatureTransformerSlice
 from .features import FeatureSet
 from .quantize import QuantizationConfig, QuantizationManager

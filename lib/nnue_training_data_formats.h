@@ -6890,17 +6890,19 @@ namespace binpack
 
     struct TrainingDataEntry
     {
-        chess::Position pos;
-        chess::Move move;
-        std::int16_t score;
-        std::uint16_t ply;
-        std::int16_t result;
+        chess::Position pos;  // 局面
+        chess::Move move;     // 走法
+        std::int16_t score;   // 局面评估分数
+        std::uint16_t ply;    // 步数(从游戏开始算起)
+        std::int16_t result;  // 游戏结果(1=白胜, -1=黑胜, 0=平局)
 
+        // 走法是否合法
         [[nodiscard]] bool isValid() const
         {
             return pos.isMoveLegal(move);
         }
 
+        // 是否吃子
         [[nodiscard]] bool isCapturingMove() const
         {
             return pos.pieceAt(move.to) != chess::Piece::none() &&
@@ -6909,6 +6911,7 @@ namespace binpack
 
         // The win rate model returns the probability (per mille) of winning given an eval
         // and a game-ply. The model fits rather accurately the LTC fishtest statistics.
+        // 胜率预测
         std::tuple<double, double, double> win_rate_model() const {
 
            // The model captures only up to 240 plies, so limit input (and rescale)
@@ -6937,6 +6940,7 @@ namespace binpack
         }
 
         // how likely is end-game result with the current score?
+        // 结果预测
         double score_result_prob() const {
            auto [w, l, d] = win_rate_model();
            if (result > 0)
