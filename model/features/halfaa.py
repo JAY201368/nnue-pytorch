@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
-import chess  # TODO: handcraft our own chess lib
+# import chess  # TODO: handcraft our own chess lib
+import animalChess as chess
 import torch
 
 from .feature_block import FeatureBlock
@@ -10,7 +11,7 @@ FILES = 7  # 7列
 NUM_SQ = FILES * RANKS  # 63格
 NUM_PT = 16  # 双方各8种
 NUM_PLANES = NUM_SQ * NUM_PT + 1  # 1009
-NUM_ATTACK_BUCKETS = 8  # 攻击桶数量
+NUM_ATTACK_BUCKETS = 8  # 攻击桶数量: 8级
 
 
 def orient(
@@ -64,7 +65,7 @@ def halfaa_psqts():
         # chess.BISHOP: 825,
         # chess.ROOK: 1276,
         # chess.QUEEN: 2538,
-        # TODO: fill up piece-square table values
+        # TODO: fill up piece-square table values of pieces
         chess.ELEPHANT: 0,
         chess.WOLF: 0,
         chess.CHEETAH: 0,

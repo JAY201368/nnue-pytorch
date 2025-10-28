@@ -61,17 +61,19 @@ UNICODE_PIECE_SYMBOLS = {
     "P": "♙", "p": "♟",
 }
 
-FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g", "h"]
+FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 
-RANK_NAMES = ["1", "2", "3", "4", "5", "6", "7", "8"]
+RANK_NAMES = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
+# TODO: Starting Fen
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 """The FEN for the standard chess starting position."""
 
+# TODO: Starting Board Fen
 STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 """The board part of the FEN for the standard chess starting position."""
 
-
+# TODO: Status
 class Status(enum.IntFlag):
     VALID = 0
     NO_WHITE_KING = 1
@@ -112,29 +114,30 @@ STATUS_TOO_MANY_CHECKERS = Status.TOO_MANY_CHECKERS
 
 Square = int
 SQUARES = [
-    A1, B1, C1, D1, E1, F1, G1, H1,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A8, B8, C8, D8, E8, F8, G8, H8,
-] = range(64)
+    A1, B1, C1, D1, E1, F1, G1,
+    A2, B2, C2, D2, E2, F2, G2,
+    A3, B3, C3, D3, E3, F3, G3,
+    A4, B4, C4, D4, E4, F4, G4,
+    A5, B5, C5, D5, E5, F5, G5,
+    A6, B6, C6, D6, E6, F6, G6,
+    A7, B7, C7, D7, E7, F7, G7,
+    A8, B8, C8, D8, E8, F8, G8,
+    A9, B9, C9, D9, E9, F9, G9,
+] = range(63)
 
 SQUARE_NAMES = [f + r for r in RANK_NAMES for f in FILE_NAMES]
 
 def square(file_index: int, rank_index: int) -> Square:
     """Gets a square number by file and rank index."""
-    return rank_index * 8 + file_index
+    return rank_index * 9 + file_index
 
 def square_file(square: Square) -> int:
     """Gets the file index of the square where ``0`` is the a-file."""
-    return square & 7
+    return square % 9
 
 def square_rank(square: Square) -> int:
     """Gets the rank index of the square where ``0`` is the first rank."""
-    return square >> 3
+    return square // 9
 
 def square_name(square: Square) -> str:
     """Gets the name of the square, like ``a3``."""
@@ -148,29 +151,34 @@ def square_distance(a: Square, b: Square) -> int:
 
 def square_mirror(square: Square) -> Square:
     """Mirrors the square vertically."""
-    return square ^ 0x38
+    file = square % 9
+    rank = 9 - square // 9
+    return rank * 9 + file
 
 SQUARES_180 = [square_mirror(sq) for sq in SQUARES]
 
 
 Bitboard = int
 BB_EMPTY = 0
-BB_ALL = 0xffff_ffff_ffff_ffff
+BB_ALL = 0xefff_ffff_ffff_ffff
 
+# 63位bitmap
 BB_SQUARES = [
-    BB_A1, BB_B1, BB_C1, BB_D1, BB_E1, BB_F1, BB_G1, BB_H1,
-    BB_A2, BB_B2, BB_C2, BB_D2, BB_E2, BB_F2, BB_G2, BB_H2,
-    BB_A3, BB_B3, BB_C3, BB_D3, BB_E3, BB_F3, BB_G3, BB_H3,
-    BB_A4, BB_B4, BB_C4, BB_D4, BB_E4, BB_F4, BB_G4, BB_H4,
-    BB_A5, BB_B5, BB_C5, BB_D5, BB_E5, BB_F5, BB_G5, BB_H5,
-    BB_A6, BB_B6, BB_C6, BB_D6, BB_E6, BB_F6, BB_G6, BB_H6,
-    BB_A7, BB_B7, BB_C7, BB_D7, BB_E7, BB_F7, BB_G7, BB_H7,
-    BB_A8, BB_B8, BB_C8, BB_D8, BB_E8, BB_F8, BB_G8, BB_H8,
+    BB_A1, BB_B1, BB_C1, BB_D1, BB_E1, BB_F1, BB_G1,
+    BB_A2, BB_B2, BB_C2, BB_D2, BB_E2, BB_F2, BB_G2,
+    BB_A3, BB_B3, BB_C3, BB_D3, BB_E3, BB_F3, BB_G3,
+    BB_A4, BB_B4, BB_C4, BB_D4, BB_E4, BB_F4, BB_G4,
+    BB_A5, BB_B5, BB_C5, BB_D5, BB_E5, BB_F5, BB_G5,
+    BB_A6, BB_B6, BB_C6, BB_D6, BB_E6, BB_F6, BB_G6,
+    BB_A7, BB_B7, BB_C7, BB_D7, BB_E7, BB_F7, BB_G7,
+    BB_A8, BB_B8, BB_C8, BB_D8, BB_E8, BB_F8, BB_G8,
+    BB_A9, BB_B9, BB_C9, BB_D9, BB_E9, BB_F9, BB_G9,
 ] = [1 << sq for sq in SQUARES]
 
-BB_CORNERS = BB_A1 | BB_H1 | BB_A8 | BB_H8
-BB_CENTER = BB_D4 | BB_E4 | BB_D5 | BB_E5
+BB_CORNERS = BB_A1 | BB_G1 | BB_A9 | BB_G9
+BB_CENTER = BB_D5
 
+# TODO: ?
 BB_LIGHT_SQUARES = 0x55aa_55aa_55aa_55aa
 BB_DARK_SQUARES = 0xaa55_aa55_aa55_aa55
 
