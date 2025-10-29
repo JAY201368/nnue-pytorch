@@ -122,9 +122,9 @@ class Features(FeatureBlock):
 class FactorizedFeatures(FeatureBlock):
     def __init__(self):
         super().__init__(
-            "HalfAA^",
+            "HalfATA^",
             0x5F134CB8,
-            OrderedDict([("HalfAA", NUM_PLANES * NUM_ATTACK_BUCKETS), ("A", NUM_SQ * NUM_PT)]),
+            OrderedDict([("HalfATA", NUM_PLANES * NUM_ATTACK_BUCKETS), ("A", NUM_SQ * NUM_PT)]),
         )
 
     def get_active_features(self, board: chess.Board):
