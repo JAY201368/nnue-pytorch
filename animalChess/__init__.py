@@ -52,6 +52,7 @@ def piece_symbol(piece_type: PieceType) -> str:
 def piece_name(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_NAMES[piece_type])
 
+# TODO: find symbols(optional?)
 UNICODE_PIECE_SYMBOLS = {
     "R": "♖", "r": "♜",
     "N": "♘", "n": "♞",
@@ -76,15 +77,15 @@ STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 # TODO: Status
 class Status(enum.IntFlag):
     VALID = 0
-    NO_WHITE_KING = 1
-    NO_BLACK_KING = 2
-    TOO_MANY_KINGS = 4
+    # NO_WHITE_KING = 1
+    # NO_BLACK_KING = 2
+    # TOO_MANY_KINGS = 4
     TOO_MANY_WHITE_PAWNS = 8
     TOO_MANY_BLACK_PAWNS = 16
-    PAWNS_ON_BACKRANK = 32
+    # PAWNS_ON_BACKRANK = 32
     TOO_MANY_WHITE_PIECES = 64
     TOO_MANY_BLACK_PIECES = 128
-    BAD_CASTLING_RIGHTS = 256
+    # BAD_CASTLING_RIGHTS = 256
     INVALID_EP_SQUARE = 512
     OPPOSITE_CHECK = 1024
     EMPTY = 2048
@@ -94,15 +95,15 @@ class Status(enum.IntFlag):
     TOO_MANY_CHECKERS = 32768
 
 STATUS_VALID = Status.VALID
-STATUS_NO_WHITE_KING = Status.NO_WHITE_KING
-STATUS_NO_BLACK_KING = Status.NO_BLACK_KING
-STATUS_TOO_MANY_KINGS = Status.TOO_MANY_KINGS
+# STATUS_NO_WHITE_KING = Status.NO_WHITE_KING
+# STATUS_NO_BLACK_KING = Status.NO_BLACK_KING
+# STATUS_TOO_MANY_KINGS = Status.TOO_MANY_KINGS
 STATUS_TOO_MANY_WHITE_PAWNS = Status.TOO_MANY_WHITE_PAWNS
 STATUS_TOO_MANY_BLACK_PAWNS = Status.TOO_MANY_BLACK_PAWNS
-STATUS_PAWNS_ON_BACKRANK = Status.PAWNS_ON_BACKRANK
+# STATUS_PAWNS_ON_BACKRANK = Status.PAWNS_ON_BACKRANK
 STATUS_TOO_MANY_WHITE_PIECES = Status.TOO_MANY_WHITE_PIECES
 STATUS_TOO_MANY_BLACK_PIECES = Status.TOO_MANY_BLACK_PIECES
-STATUS_BAD_CASTLING_RIGHTS = Status.BAD_CASTLING_RIGHTS
+# STATUS_BAD_CASTLING_RIGHTS = Status.BAD_CASTLING_RIGHTS
 STATUS_INVALID_EP_SQUARE = Status.INVALID_EP_SQUARE
 STATUS_OPPOSITE_CHECK = Status.OPPOSITE_CHECK
 STATUS_EMPTY = Status.EMPTY
@@ -178,10 +179,11 @@ BB_SQUARES = [
 BB_CORNERS = BB_A1 | BB_G1 | BB_A9 | BB_G9
 BB_CENTER = BB_D5
 
-# TODO: ?
-BB_LIGHT_SQUARES = 0x55aa_55aa_55aa_55aa
-BB_DARK_SQUARES = 0xaa55_aa55_aa55_aa55
+# 黑白格
+# BB_LIGHT_SQUARES = 0x55aa_55aa_55aa_55aa
+# BB_DARK_SQUARES = 0xaa55_aa55_aa55_aa55
 
+# 选中一列
 BB_FILES = [
     BB_FILE_A,
     BB_FILE_B,
@@ -190,8 +192,9 @@ BB_FILES = [
     BB_FILE_E,
     BB_FILE_F,
     BB_FILE_G,
-    BB_FILE_H,
-] = [0x0101_0101_0101_0101 << i for i in range(8)]
+] = [0x0102_0408_1020_4081 << i for i in range(7)]
+# 0x0101_0101_0101_0101 << i for i in range(7)
+# 0b0000_0001_0000_0010_0000_0100_0000_1000_0001_0000_0010_0000_0100_0000_1000_0001
 
 BB_RANKS = [
     BB_RANK_1,
@@ -202,12 +205,18 @@ BB_RANKS = [
     BB_RANK_6,
     BB_RANK_7,
     BB_RANK_8,
-] = [0xff << (8 * i) for i in range(8)]
+    BB_RANK_9
+] = [0xef << (7 * i) for i in range(9)]
+# 0b0111_1111
 
-BB_BACKRANKS = BB_RANK_1 | BB_RANK_8
+BB_BACKRANKS = BB_RANK_1 | BB_RANK_9
 
 
 def lsb(bb: Bitboard) -> int:
+    """
+    最低有效位的索引?
+    TODO: 能否保留?
+    """
     return (bb & -bb).bit_length() - 1
 
 def scan_forward(bb: Bitboard) -> Iterator[Square]:
