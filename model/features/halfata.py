@@ -35,7 +35,7 @@ def orient(
     flipped_rank = RANKS - 1 - rank
     return flipped_rank * FILES + file
 
-def halfaa_idx(
+def halfata_idx(
         is_white_pov: bool,
         # king_sq: int,  不再需要王位
         sq: int,
@@ -54,7 +54,7 @@ def classify_attack_bucket(board: chess.Board) -> int:
     # TODO: classify attack buckets
     return 0
 
-def halfaa_psqts():
+def halfata_psqts():
     """
     填写psqt值
     """
@@ -66,12 +66,12 @@ def halfaa_psqts():
         # chess.ROOK: 1276,
         # chess.QUEEN: 2538,
         # TODO: fill up piece-square table values of pieces
-        chess.ELEPHANT: 0,
-        chess.WOLF: 0,
-        chess.CHEETAH: 0,
-        chess.MOUSE: 0,
         chess.CAT: 0,
         chess.DOG: 0,
+        chess.WOLF: 0,
+        chess.CHEETAH: 0,
+        chess.ELEPHANT: 0,
+        chess.MOUSE: 0,
         chess.TIGER: 0,
         chess.LION: 0,
     }
@@ -82,8 +82,8 @@ def halfaa_psqts():
     for attack_bucket in range(NUM_ATTACK_BUCKETS):
         for s in range(NUM_SQ):
             for pt, val in piece_values.items():
-                idxw = halfaa_idx(True, s, chess.Piece(pt, chess.WHITE), attack_bucket)
-                idxb = halfaa_idx(True, s, chess.Piece(pt, chess.BLACK), attack_bucket)
+                idxw = halfata_idx(True, s, chess.Piece(pt, chess.WHITE), attack_bucket)
+                idxb = halfata_idx(True, s, chess.Piece(pt, chess.BLACK), attack_bucket)
                 values[idxw] = val
                 values[idxb] = -val
 
@@ -92,8 +92,9 @@ def halfaa_psqts():
 
 class Features(FeatureBlock):
     def __init__(self):
+        # Half Attack buckets and All pieces -> "HalfATA"
         super().__init__(
-            "HalfAA", 0x5F134CB8, OrderedDict([("HalfAA", NUM_PLANES * NUM_ATTACK_BUCKETS)])
+            "HalfATA", 0x5F134CB8, OrderedDict([("HalfATA", NUM_PLANES * NUM_ATTACK_BUCKETS)])
         )
 
     def get_active_features(
@@ -109,13 +110,13 @@ class Features(FeatureBlock):
             # assert ksq is not None
             attack_bucket = classify_attack_bucket(board)
             for sq, p in board.piece_map().items():
-                indices[halfaa_idx(turn, sq, p, attack_bucket)] = 1.0
+                indices[halfata_idx(turn, sq, p, attack_bucket)] = 1.0
             return indices
 
         return piece_features(chess.WHITE), piece_features(chess.BLACK)
 
     def get_initial_psqt_features(self) -> list[int]:
-        return halfaa_psqts()
+        return halfata_psqts()
 
 
 class FactorizedFeatures(FeatureBlock):
@@ -140,7 +141,7 @@ class FactorizedFeatures(FeatureBlock):
         return [idx, self.get_factor_base_feature("A") + a_idx]
 
     def get_initial_psqt_features(self) -> list[int]:
-        return halfaa_psqts() + [0] * (NUM_SQ * NUM_PT)
+        return halfata_psqts() + [0] * (NUM_SQ * NUM_PT)
 
 
 """
