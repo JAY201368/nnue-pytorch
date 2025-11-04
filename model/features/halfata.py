@@ -11,7 +11,7 @@ FILES = 7  # 7列
 NUM_SQ = FILES * RANKS  # 63格
 NUM_PT = 16  # 双方各8种
 NUM_PLANES = NUM_SQ * NUM_PT + 1  # 1009
-NUM_ATTACK_BUCKETS = 8  # 攻击桶数量: 8级
+NUM_ATTACK_BUCKETS = 6  # 攻击桶数量: 8级
 
 
 def orient(
@@ -50,9 +50,19 @@ def halfata_idx(
     # 王不动, 删除王桶, 改为用攻击桶
     return 1 + orient(is_white_pov, sq) + p_idx * NUM_SQ + attack_bucket * NUM_PLANES
 
-def classify_attack_bucket(board: chess.Board) -> int:
+def classify_attack_bucket(board: chess.Board, color: bool) -> int:
     # TODO: classify attack buckets
-    return 0
+    mark = 0  # 激烈程度评分, 范围[0, 12]
+    mark += len(board.pieces(chess.LION, color)) * 3
+    mark += len(board.pieces(chess.TIGER, color)) * 3
+    mark += len(board.pieces(chess.MOUSE, color)) * 2
+    mark += len(board.pieces(chess.ELEPHANT, color)) * 2
+    mark += len(board.pieces(chess.CHEETAH, color))
+    mark += len(board.pieces(chess.WOLF, color))
+    # mark += len(board.pieces(chess.DOG, color))
+    # mark += len(board.pieces(chess.HACHIMI, color))
+
+    return mark // 2
 
 def halfata_psqts():
     """
@@ -66,7 +76,7 @@ def halfata_psqts():
         # chess.ROOK: 1276,
         # chess.QUEEN: 2538,
         # TODO: fill up piece-square table values of pieces
-        chess.CAT: 0,
+        chess.HACHIMI: 0,
         chess.DOG: 0,
         chess.WOLF: 0,
         chess.CHEETAH: 0,
@@ -104,11 +114,11 @@ class Features(FeatureBlock):
         接收棋盘
         返回黑白两个视角的特征向量
         """
-        def piece_features(turn):
+        def piece_features(turn: bool):
             indices = torch.zeros(NUM_PLANES)
             # ksq = board.king(turn)
             # assert ksq is not None
-            attack_bucket = classify_attack_bucket(board)
+            attack_bucket = classify_attack_bucket(board, turn)
             for sq, p in board.piece_map().items():
                 indices[halfata_idx(turn, sq, p, attack_bucket)] = 1.0
             return indices

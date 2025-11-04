@@ -8,3 +8,4 @@ easy_train_data
 *.yaml
 .DS_Store
 ./test.py
+.idea/

@@ -42,9 +42,9 @@ COLORS = [WHITE, BLACK] = [True, False]
 COLOR_NAMES = ["black", "white"]
 
 PieceType = int
-PIECE_TYPES = [MOUSE, CAT, DOG, WOLF, CHEETAH, TIGER, LION, ELEPHANT] = range(1, 9)
-PIECE_SYMBOLS = [None, "m", "c", "d", "w", "c", "t", "l", "e"]
-PIECE_NAMES = [None, "mouse", "cat", "dog", "wolf", "cheetah", "tiger", "lion", "elephant"]
+PIECE_TYPES = [MOUSE, HACHIMI, DOG, WOLF, CHEETAH, TIGER, LION, ELEPHANT] = range(1, 9)
+PIECE_SYMBOLS = [None, "m", "h", "d", "w", "c", "t", "l", "e"]
+PIECE_NAMES = [None, "mouse", "hachimi", "dog", "wolf", "cheetah", "tiger", "lion", "elephant"]
 
 def piece_symbol(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_SYMBOLS[piece_type])
@@ -52,14 +52,15 @@ def piece_symbol(piece_type: PieceType) -> str:
 def piece_name(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_NAMES[piece_type])
 
-# TODO: find symbols(optional?)
 UNICODE_PIECE_SYMBOLS = {
-    "R": "♖", "r": "♜",
-    "N": "♘", "n": "♞",
-    "B": "♗", "b": "♝",
-    "Q": "♕", "q": "♛",
-    "K": "♔", "k": "♚",
-    "P": "♙", "p": "♟",
+    "E": "🐘", "e": "🐘",  # Elephant
+    "L": "🦁", "l": "🦁",  # Lion (狮)
+    "T": "🐯", "t": "🐯",  # Tiger
+    "C": "🐆", "c": "🐆",  # Cheetah
+    "W": "🐺", "w": "🐺",  # Wolf
+    "D": "🐕", "d": "🐕",  # Dog
+    "H": "🐱", "h": "🐱",  # Hachimi
+    "R": "🐭", "r": "🐭",  # Rat
 }
 
 FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
@@ -67,11 +68,11 @@ FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 RANK_NAMES = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 # TODO: Starting Fen
-STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+STARTING_FEN = "t5l/1c3d1/e1w1c1m/7/7/7/M1C1W1E/1D3C1/L5T w KQkq - 0 1"
 """The FEN for the standard chess starting position."""
 
 # TODO: Starting Board Fen
-STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+STARTING_BOARD_FEN = "t5l/1c3d1/e1w1c1m/7/7/7/M1C1W1E/1D3C1/L5T"
 """The board part of the FEN for the standard chess starting position."""
 
 # TODO: Status
@@ -126,19 +127,35 @@ SQUARES = [
     A9, B9, C9, D9, E9, F9, G9,
 ] = range(63)
 
+# 特殊地形定义
+# 小河 (River) - 中间的水域，注意D列(中间列)是陆桥不是河
+RIVER_SQUARES = [
+    B4, C4, E4, F4,    # 第4行 (不包括D4)
+    B5, C5, E5, F5,    # 第5行 (不包括D5)
+    B6, C6, E6, F6,    # 第6行 (不包括D6)
+]
+
+# 陷阱 (Traps)
+WHITE_TRAPS = [C1, E1, D2]    # 白方陷阱 (底部)
+BLACK_TRAPS = [C9, E9, D8]    # 黑方陷阱 (顶部)
+
+# 兽穴 (Den)
+WHITE_DEN = D1    # 白方兽穴 (底部中央)
+BLACK_DEN = D9    # 黑方兽穴 (顶部中央)
+
 SQUARE_NAMES = [f + r for r in RANK_NAMES for f in FILE_NAMES]
 
 def square(file_index: int, rank_index: int) -> Square:
     """Gets a square number by file and rank index."""
-    return rank_index * 9 + file_index
+    return rank_index * 7 + file_index
 
 def square_file(square: Square) -> int:
     """Gets the file index of the square where ``0`` is the a-file."""
-    return square % 9
+    return square % 7
 
 def square_rank(square: Square) -> int:
     """Gets the rank index of the square where ``0`` is the first rank."""
-    return square // 9
+    return square // 7
 
 def square_name(square: Square) -> str:
     """Gets the name of the square, like ``a3``."""
@@ -152,16 +169,16 @@ def square_distance(a: Square, b: Square) -> int:
 
 def square_mirror(square: Square) -> Square:
     """Mirrors the square vertically."""
-    file = square % 9
-    rank = 9 - square // 9
-    return rank * 9 + file
+    file = square % 7
+    rank = 9 - square // 7
+    return rank * 7 + file
 
 SQUARES_180 = [square_mirror(sq) for sq in SQUARES]
 
 
 Bitboard = int
 BB_EMPTY = 0
-BB_ALL = 0xefff_ffff_ffff_ffff
+BB_ALL = 0x7fff_ffff_ffff_ffff
 
 # 63位bitmap
 BB_SQUARES = [
@@ -206,7 +223,7 @@ BB_RANKS = [
     BB_RANK_7,
     BB_RANK_8,
     BB_RANK_9
-] = [0xef << (7 * i) for i in range(9)]
+] = [0x7f << (7 * i) for i in range(9)]
 # 0b0111_1111
 
 BB_BACKRANKS = BB_RANK_1 | BB_RANK_9
@@ -214,8 +231,7 @@ BB_BACKRANKS = BB_RANK_1 | BB_RANK_9
 
 def lsb(bb: Bitboard) -> int:
     """
-    最低有效位的索引?
-    TODO: 能否保留?
+    最低有效位的索引
     """
     return (bb & -bb).bit_length() - 1
 
@@ -241,52 +257,52 @@ except AttributeError:
     def popcount(bb: Bitboard) -> int:
         return bin(bb).count("1")
 
-def flip_vertical(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
-    bb = ((bb >> 8) & 0x00ff_00ff_00ff_00ff) | ((bb & 0x00ff_00ff_00ff_00ff) << 8)
-    bb = ((bb >> 16) & 0x0000_ffff_0000_ffff) | ((bb & 0x0000_ffff_0000_ffff) << 16)
-    bb = (bb >> 32) | ((bb & 0x0000_0000_ffff_ffff) << 32)
-    return bb
-
-def flip_horizontal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#MirrorHorizontally
-    bb = ((bb >> 1) & 0x5555_5555_5555_5555) | ((bb & 0x5555_5555_5555_5555) << 1)
-    bb = ((bb >> 2) & 0x3333_3333_3333_3333) | ((bb & 0x3333_3333_3333_3333) << 2)
-    bb = ((bb >> 4) & 0x0f0f_0f0f_0f0f_0f0f) | ((bb & 0x0f0f_0f0f_0f0f_0f0f) << 4)
-    return bb
-
-def flip_diagonal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheDiagonal
-    t = (bb ^ (bb << 28)) & 0x0f0f_0f0f_0000_0000
-    bb = bb ^ (t ^ (t >> 28))
-    t = (bb ^ (bb << 14)) & 0x3333_0000_3333_0000
-    bb = bb ^ (t ^ (t >> 14))
-    t = (bb ^ (bb << 7)) & 0x5500_5500_5500_5500
-    bb = bb ^ (t ^ (t >> 7))
-    return bb
-
-def flip_anti_diagonal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheAntidiagonal
-    t = bb ^ (bb << 36)
-    bb = bb ^ ((t ^ (bb >> 36)) & 0xf0f0_f0f0_0f0f_0f0f)
-    t = (bb ^ (bb << 18)) & 0xcccc_0000_cccc_0000
-    bb = bb ^ (t ^ (t >> 18))
-    t = (bb ^ (bb << 9)) & 0xaa00_aa00_aa00_aa00
-    bb = bb ^ (t ^ (t >> 9))
-    return bb
+# def flip_vertical(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
+#     bb = ((bb >> 8) & 0x00ff_00ff_00ff_00ff) | ((bb & 0x00ff_00ff_00ff_00ff) << 8)
+#     bb = ((bb >> 16) & 0x0000_ffff_0000_ffff) | ((bb & 0x0000_ffff_0000_ffff) << 16)
+#     bb = (bb >> 32) | ((bb & 0x0000_0000_ffff_ffff) << 32)
+#     return bb
+#
+# def flip_horizontal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#MirrorHorizontally
+#     bb = ((bb >> 1) & 0x5555_5555_5555_5555) | ((bb & 0x5555_5555_5555_5555) << 1)
+#     bb = ((bb >> 2) & 0x3333_3333_3333_3333) | ((bb & 0x3333_3333_3333_3333) << 2)
+#     bb = ((bb >> 4) & 0x0f0f_0f0f_0f0f_0f0f) | ((bb & 0x0f0f_0f0f_0f0f_0f0f) << 4)
+#     return bb
+#
+# def flip_diagonal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheDiagonal
+#     t = (bb ^ (bb << 28)) & 0x0f0f_0f0f_0000_0000
+#     bb = bb ^ (t ^ (t >> 28))
+#     t = (bb ^ (bb << 14)) & 0x3333_0000_3333_0000
+#     bb = bb ^ (t ^ (t >> 14))
+#     t = (bb ^ (bb << 7)) & 0x5500_5500_5500_5500
+#     bb = bb ^ (t ^ (t >> 7))
+#     return bb
+#
+# def flip_anti_diagonal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheAntidiagonal
+#     t = bb ^ (bb << 36)
+#     bb = bb ^ ((t ^ (bb >> 36)) & 0xf0f0_f0f0_0f0f_0f0f)
+#     t = (bb ^ (bb << 18)) & 0xcccc_0000_cccc_0000
+#     bb = bb ^ (t ^ (t >> 18))
+#     t = (bb ^ (bb << 9)) & 0xaa00_aa00_aa00_aa00
+#     bb = bb ^ (t ^ (t >> 9))
+#     return bb
 
 
 def shift_down(b: Bitboard) -> Bitboard:
-    return b >> 8
+    return b >> 7
 
 def shift_2_down(b: Bitboard) -> Bitboard:
-    return b >> 16
+    return b >> 14
 
 def shift_up(b: Bitboard) -> Bitboard:
-    return (b << 8) & BB_ALL
+    return (b << 7) & BB_ALL
 
 def shift_2_up(b: Bitboard) -> Bitboard:
-    return (b << 16) & BB_ALL
+    return (b << 14) & BB_ALL
 
 def shift_right(b: Bitboard) -> Bitboard:
     return (b << 1) & ~BB_FILE_A & BB_ALL
@@ -295,22 +311,22 @@ def shift_2_right(b: Bitboard) -> Bitboard:
     return (b << 2) & ~BB_FILE_A & ~BB_FILE_B & BB_ALL
 
 def shift_left(b: Bitboard) -> Bitboard:
-    return (b >> 1) & ~BB_FILE_H
+    return (b >> 1) & ~BB_FILE_G
 
 def shift_2_left(b: Bitboard) -> Bitboard:
-    return (b >> 2) & ~BB_FILE_G & ~BB_FILE_H
+    return (b >> 2) & ~BB_FILE_F & ~BB_FILE_G
 
 def shift_up_left(b: Bitboard) -> Bitboard:
-    return (b << 7) & ~BB_FILE_H & BB_ALL
+    return (b << 6) & ~BB_FILE_G & BB_ALL
 
 def shift_up_right(b: Bitboard) -> Bitboard:
-    return (b << 9) & ~BB_FILE_A & BB_ALL
+    return (b << 8) & ~BB_FILE_A & BB_ALL
 
 def shift_down_left(b: Bitboard) -> Bitboard:
-    return (b >> 9) & ~BB_FILE_H
+    return (b >> 8) & ~BB_FILE_G
 
 def shift_down_right(b: Bitboard) -> Bitboard:
-    return (b >> 7) & ~BB_FILE_A
+    return (b >> 6) & ~BB_FILE_A
 
 
 def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
@@ -410,7 +426,6 @@ class Piece:
 
     def symbol(self) -> str:
         """
-        Gets the symbol ``P``, ``N``, ``B``, ``R``, ``Q`` or ``K`` for white
         pieces or the lower-case variants for the black pieces.
         """
         symbol = piece_symbol(self.piece_type)
@@ -432,9 +447,9 @@ class Piece:
     def __str__(self) -> str:
         return self.symbol()
 
-    def _repr_svg_(self) -> str:
-        import chess.svg
-        return chess.svg.piece(self, size=45)
+    # def _repr_svg_(self) -> str:
+    #     import chess.svg
+    #     return chess.svg.piece(self, size=45)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Piece):
@@ -460,11 +475,9 @@ class Move:
     Drops and null moves are supported.
     """
 
-    def __init__(self, from_square: Square, to_square: Square, promotion: Optional[PieceType] = None, drop: Optional[PieceType] = None) -> None:
+    def __init__(self, from_square: Square, to_square: Square) -> None:
         self.from_square = from_square
         self.to_square = to_square
-        self.promotion = promotion
-        self.drop = drop
 
     def uci(self) -> str:
         """
@@ -475,11 +488,7 @@ class Move:
 
         The UCI representation of a null move is ``0000``.
         """
-        if self.drop:
-            return piece_symbol(self.drop).upper() + "@" + SQUARE_NAMES[self.to_square]
-        elif self.promotion:
-            return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square] + piece_symbol(self.promotion)
-        elif self:
+        if self:
             return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square]
         else:
             return "0000"
@@ -488,15 +497,14 @@ class Move:
         return self.uci() if self else "@@@@"
 
     def __bool__(self) -> bool:
-        return bool(self.from_square or self.to_square or self.promotion or self.drop)
+        return bool(self.from_square or self.to_square)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Move):
             return (
                 self.from_square == other.from_square and
-                self.to_square == other.to_square and
-                self.promotion == other.promotion and
-                self.drop == other.drop)
+                self.to_square == other.to_square
+            )
         else:
             return NotImplemented
 
@@ -507,7 +515,7 @@ class Move:
         return self.uci()
 
     def __hash__(self) -> int:
-        return hash((self.to_square, self.from_square, self.promotion, self.drop))
+        return hash((self.to_square, self.from_square))
 
     @classmethod
     def from_uci(cls, uci: str) -> "Move":
@@ -518,19 +526,14 @@ class Move:
         """
         if uci == "0000":
             return cls.null()
-        elif len(uci) == 4 and "@" == uci[1]:
-            drop = PIECE_SYMBOLS.index(uci[0].lower())
-            square = SQUARE_NAMES.index(uci[2:])
-            return cls(square, square, drop=drop)
-        elif 4 <= len(uci) <= 5:
+        elif 4 == len(uci):
             from_square = SQUARE_NAMES.index(uci[0:2])
             to_square = SQUARE_NAMES.index(uci[2:4])
-            promotion = PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
             if from_square == to_square:
                 raise ValueError(f"invalid uci (use 0000 for null moves): {uci!r}")
-            return cls(from_square, to_square, promotion=promotion)
+            return cls(from_square, to_square)
         else:
-            raise ValueError(f"expected uci string to be of length 4 or 5: {uci!r}")
+            raise ValueError(f"expected uci string to be of length 4: {uci!r}")
 
     @classmethod
     def null(cls) -> "Move":
@@ -541,9 +544,6 @@ class Move:
         forfeits en passant capturing). Null moves evaluate to ``False`` in
         boolean contexts.
 
-        >>> import chess
-        >>>
-        >>> bool(chess.Move.null())
         False
         """
         return cls(0, 0)
@@ -572,54 +572,50 @@ class BaseBoard:
             self._set_board_fen(board_fen)
 
     def _reset_board(self) -> None:
-        self.pawns = BB_RANK_2 | BB_RANK_7
-        self.knights = BB_B1 | BB_G1 | BB_B8 | BB_G8
-        self.bishops = BB_C1 | BB_F1 | BB_C8 | BB_F8
-        self.rooks = BB_CORNERS
-        self.queens = BB_D1 | BB_D8
-        self.kings = BB_E1 | BB_E8
-
-        self.promoted = BB_EMPTY
-
-        self.occupied_co[WHITE] = BB_RANK_1 | BB_RANK_2
-        self.occupied_co[BLACK] = BB_RANK_7 | BB_RANK_8
-        self.occupied = BB_RANK_1 | BB_RANK_2 | BB_RANK_7 | BB_RANK_8
+        self.mice = BB_A7 | BB_G3
+        self.hachimis = BB_B2 | BB_F8
+        self.dogs = BB_B8 | BB_F2
+        self.wolves = BB_C3 | BB_E7
+        self.cheetahs = BB_E3 | BB_C7
+        self.tigers = BB_A1 | BB_G9
+        self.lions = BB_G1 | BB_A9
+        self.elephants = BB_A3 | BB_G7
 
     def reset_board(self) -> None:
         """Resets piece positions to the starting position."""
         self._reset_board()
 
     def _clear_board(self) -> None:
-        self.pawns = BB_EMPTY
-        self.knights = BB_EMPTY
-        self.bishops = BB_EMPTY
-        self.rooks = BB_EMPTY
-        self.queens = BB_EMPTY
-        self.kings = BB_EMPTY
-
-        self.promoted = BB_EMPTY
-
-        self.occupied_co[WHITE] = BB_EMPTY
-        self.occupied_co[BLACK] = BB_EMPTY
-        self.occupied = BB_EMPTY
+        self.mice = BB_EMPTY
+        self.hachimis = BB_EMPTY
+        self.dogs = BB_EMPTY
+        self.wolves = BB_EMPTY
+        self.cheetahs = BB_EMPTY
+        self.tigers = BB_EMPTY
+        self.lions = BB_EMPTY
+        self.elephants = BB_EMPTY
 
     def clear_board(self) -> None:
         """Clears the board."""
         self._clear_board()
 
     def pieces_mask(self, piece_type: PieceType, color: Color) -> Bitboard:
-        if piece_type == PAWN:
-            bb = self.pawns
-        elif piece_type == KNIGHT:
-            bb = self.knights
-        elif piece_type == BISHOP:
-            bb = self.bishops
-        elif piece_type == ROOK:
-            bb = self.rooks
-        elif piece_type == QUEEN:
-            bb = self.queens
-        elif piece_type == KING:
-            bb = self.kings
+        if piece_type == MOUSE:
+            bb = self.mice
+        elif piece_type == HACHIMI:
+            bb = self.hachimis
+        elif piece_type == DOG:
+            bb = self.dogs
+        elif piece_type == WOLF:
+            bb = self.wolves
+        elif piece_type == CHEETAH:
+            bb = self.cheetahs
+        elif piece_type == TIGER:
+            bb = self.tigers
+        elif piece_type == LION:
+            bb = self.lions
+        elif piece_type == ELEPHANT:
+            bb = self.elephants
 
         return bb & self.occupied_co[color]
 
