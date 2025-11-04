@@ -42,9 +42,9 @@ COLORS = [WHITE, BLACK] = [True, False]
 COLOR_NAMES = ["black", "white"]
 
 PieceType = int
-PIECE_TYPES = [MOUSE, CAT, DOG, WOLF, CHEETAH, TIGER, LION, ELEPHANT] = range(1, 9)
-PIECE_SYMBOLS = [None, "m", "c", "d", "w", "c", "t", "l", "e"]
-PIECE_NAMES = [None, "mouse", "cat", "dog", "wolf", "cheetah", "tiger", "lion", "elephant"]
+PIECE_TYPES = [MOUSE, HACHIMI, DOG, WOLF, CHEETAH, TIGER, LION, ELEPHANT] = range(1, 9)
+PIECE_SYMBOLS = [None, "m", "h", "d", "w", "c", "t", "l", "e"]
+PIECE_NAMES = [None, "mouse", "hachimi", "dog", "wolf", "cheetah", "tiger", "lion", "elephant"]
 
 def piece_symbol(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_SYMBOLS[piece_type])
@@ -54,12 +54,14 @@ def piece_name(piece_type: PieceType) -> str:
 
 # TODO: find symbols(optional?)
 UNICODE_PIECE_SYMBOLS = {
-    "R": "♖", "r": "♜",
-    "N": "♘", "n": "♞",
-    "B": "♗", "b": "♝",
-    "Q": "♕", "q": "♛",
-    "K": "♔", "k": "♚",
-    "P": "♙", "p": "♟",
+    "E": "🐘", "e": "🐘",  # Elephant
+    "L": "🦁", "l": "🦁",  # Lion (狮)
+    "T": "🐯", "t": "🐯",  # Tiger
+    "C": "🐆", "c": "🐆",  # Cheetah
+    "W": "🐺", "w": "🐺",  # Wolf
+    "D": "🐕", "d": "🐕",  # Dog
+    "H": "🐱", "h": "🐱",  # Hachimi
+    "R": "🐭", "r": "🐭",  # Rat
 }
 
 FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
@@ -126,19 +128,35 @@ SQUARES = [
     A9, B9, C9, D9, E9, F9, G9,
 ] = range(63)
 
+# 特殊地形定义
+# 小河 (River) - 中间的水域，注意D列(中间列)是陆桥不是河
+RIVER_SQUARES = [
+    B4, C4, E4, F4,    # 第4行 (不包括D4)
+    B5, C5, E5, F5,    # 第5行 (不包括D5)
+    B6, C6, E6, F6,    # 第6行 (不包括D6)
+]
+
+# 陷阱 (Traps)
+WHITE_TRAPS = [C1, E1, D2]    # 白方陷阱 (底部)
+BLACK_TRAPS = [C9, E9, D8]    # 黑方陷阱 (顶部)
+
+# 兽穴 (Den)
+WHITE_DEN = D1    # 白方兽穴 (底部中央)
+BLACK_DEN = D9    # 黑方兽穴 (顶部中央)
+
 SQUARE_NAMES = [f + r for r in RANK_NAMES for f in FILE_NAMES]
 
 def square(file_index: int, rank_index: int) -> Square:
     """Gets a square number by file and rank index."""
-    return rank_index * 9 + file_index
+    return rank_index * 7 + file_index
 
 def square_file(square: Square) -> int:
     """Gets the file index of the square where ``0`` is the a-file."""
-    return square % 9
+    return square % 7
 
 def square_rank(square: Square) -> int:
     """Gets the rank index of the square where ``0`` is the first rank."""
-    return square // 9
+    return square // 7
 
 def square_name(square: Square) -> str:
     """Gets the name of the square, like ``a3``."""
@@ -152,16 +170,16 @@ def square_distance(a: Square, b: Square) -> int:
 
 def square_mirror(square: Square) -> Square:
     """Mirrors the square vertically."""
-    file = square % 9
-    rank = 9 - square // 9
-    return rank * 9 + file
+    file = square % 7
+    rank = 9 - square // 7
+    return rank * 7 + file
 
 SQUARES_180 = [square_mirror(sq) for sq in SQUARES]
 
 
 Bitboard = int
 BB_EMPTY = 0
-BB_ALL = 0xefff_ffff_ffff_ffff
+BB_ALL = 0x7fff_ffff_ffff_ffff
 
 # 63位bitmap
 BB_SQUARES = [
@@ -206,7 +224,7 @@ BB_RANKS = [
     BB_RANK_7,
     BB_RANK_8,
     BB_RANK_9
-] = [0xef << (7 * i) for i in range(9)]
+] = [0x7f << (7 * i) for i in range(9)]
 # 0b0111_1111
 
 BB_BACKRANKS = BB_RANK_1 | BB_RANK_9
@@ -410,7 +428,6 @@ class Piece:
 
     def symbol(self) -> str:
         """
-        Gets the symbol ``P``, ``N``, ``B``, ``R``, ``Q`` or ``K`` for white
         pieces or the lower-case variants for the black pieces.
         """
         symbol = piece_symbol(self.piece_type)
@@ -432,9 +449,9 @@ class Piece:
     def __str__(self) -> str:
         return self.symbol()
 
-    def _repr_svg_(self) -> str:
-        import chess.svg
-        return chess.svg.piece(self, size=45)
+    # def _repr_svg_(self) -> str:
+    #     import chess.svg
+    #     return chess.svg.piece(self, size=45)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Piece):
@@ -460,11 +477,9 @@ class Move:
     Drops and null moves are supported.
     """
 
-    def __init__(self, from_square: Square, to_square: Square, promotion: Optional[PieceType] = None, drop: Optional[PieceType] = None) -> None:
+    def __init__(self, from_square: Square, to_square: Square) -> None:
         self.from_square = from_square
         self.to_square = to_square
-        self.promotion = promotion
-        self.drop = drop
 
     def uci(self) -> str:
         """
@@ -475,11 +490,7 @@ class Move:
 
         The UCI representation of a null move is ``0000``.
         """
-        if self.drop:
-            return piece_symbol(self.drop).upper() + "@" + SQUARE_NAMES[self.to_square]
-        elif self.promotion:
-            return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square] + piece_symbol(self.promotion)
-        elif self:
+        if self:
             return SQUARE_NAMES[self.from_square] + SQUARE_NAMES[self.to_square]
         else:
             return "0000"
@@ -488,15 +499,14 @@ class Move:
         return self.uci() if self else "@@@@"
 
     def __bool__(self) -> bool:
-        return bool(self.from_square or self.to_square or self.promotion or self.drop)
+        return bool(self.from_square or self.to_square)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Move):
             return (
                 self.from_square == other.from_square and
-                self.to_square == other.to_square and
-                self.promotion == other.promotion and
-                self.drop == other.drop)
+                self.to_square == other.to_square
+            )
         else:
             return NotImplemented
 
@@ -507,7 +517,7 @@ class Move:
         return self.uci()
 
     def __hash__(self) -> int:
-        return hash((self.to_square, self.from_square, self.promotion, self.drop))
+        return hash((self.to_square, self.from_square))
 
     @classmethod
     def from_uci(cls, uci: str) -> "Move":
@@ -518,19 +528,14 @@ class Move:
         """
         if uci == "0000":
             return cls.null()
-        elif len(uci) == 4 and "@" == uci[1]:
-            drop = PIECE_SYMBOLS.index(uci[0].lower())
-            square = SQUARE_NAMES.index(uci[2:])
-            return cls(square, square, drop=drop)
-        elif 4 <= len(uci) <= 5:
+        elif 4 == len(uci):
             from_square = SQUARE_NAMES.index(uci[0:2])
             to_square = SQUARE_NAMES.index(uci[2:4])
-            promotion = PIECE_SYMBOLS.index(uci[4]) if len(uci) == 5 else None
             if from_square == to_square:
                 raise ValueError(f"invalid uci (use 0000 for null moves): {uci!r}")
-            return cls(from_square, to_square, promotion=promotion)
+            return cls(from_square, to_square)
         else:
-            raise ValueError(f"expected uci string to be of length 4 or 5: {uci!r}")
+            raise ValueError(f"expected uci string to be of length 4: {uci!r}")
 
     @classmethod
     def null(cls) -> "Move":
@@ -541,9 +546,6 @@ class Move:
         forfeits en passant capturing). Null moves evaluate to ``False`` in
         boolean contexts.
 
-        >>> import chess
-        >>>
-        >>> bool(chess.Move.null())
         False
         """
         return cls(0, 0)
