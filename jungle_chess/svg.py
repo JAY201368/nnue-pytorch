@@ -1,7 +1,7 @@
-# SVG rendering for Animal Chess
+# SVG rendering for Animal Chess (Jungle Chess)
 # Simplified version for board visualization
 
-import animalchess
+import jungle_chess as jc
 import xml.etree.ElementTree as ET
 from typing import Optional
 
@@ -24,7 +24,7 @@ class SvgWrapper(str):
         return self
 
 
-def board(board: Optional[animalchess.Board] = None, 
+def board(board: Optional[jc.Board] = None, 
           size: Optional[int] = None,
           coordinates: bool = True) -> str:
     """
@@ -64,14 +64,14 @@ def board(board: Optional[animalchess.Board] = None,
             x = file * SQUARE_SIZE + margin  # 从左到右：a-g
             y = (8 - rank) * SQUARE_SIZE + margin  # 从上到下：i-a
             
-            sq = animalchess.square(file, rank)
+            sq = jc.square(file, rank)
             
             # 确定格子颜色
-            if sq in animalchess.RIVER_SQUARES:
+            if sq in jc.RIVER_SQUARES:
                 fill_color = DEFAULT_COLORS["river"]
-            elif sq in animalchess.WHITE_TRAPS or sq in animalchess.BLACK_TRAPS:
+            elif sq in jc.WHITE_TRAPS or sq in jc.BLACK_TRAPS:
                 fill_color = DEFAULT_COLORS["trap"]
-            elif sq == animalchess.WHITE_DEN or sq == animalchess.BLACK_DEN:
+            elif sq == jc.WHITE_DEN or sq == jc.BLACK_DEN:
                 fill_color = DEFAULT_COLORS["den"]
             else:
                 fill_color = DEFAULT_COLORS["square light"] if (file + rank) % 2 == 0 else DEFAULT_COLORS["square dark"]
@@ -87,7 +87,7 @@ def board(board: Optional[animalchess.Board] = None,
             })
             
             # 绘制特殊标记
-            if sq == animalchess.WHITE_DEN or sq == animalchess.BLACK_DEN:
+            if sq == jc.WHITE_DEN or sq == jc.BLACK_DEN:
                 ET.SubElement(svg, "text", {
                     "x": str(x + SQUARE_SIZE / 2),
                     "y": str(y + SQUARE_SIZE / 2 + 8),
@@ -95,7 +95,7 @@ def board(board: Optional[animalchess.Board] = None,
                     "font-size": "24",
                     "fill": "#000",
                 }).text = "穴"
-            elif sq in animalchess.WHITE_TRAPS or sq in animalchess.BLACK_TRAPS:
+            elif sq in jc.WHITE_TRAPS or sq in jc.BLACK_TRAPS:
                 ET.SubElement(svg, "text", {
                     "x": str(x + SQUARE_SIZE / 2),
                     "y": str(y + SQUARE_SIZE / 2 + 6),
@@ -106,15 +106,20 @@ def board(board: Optional[animalchess.Board] = None,
     
     # 绘制棋子
     if board is not None:
-        for sq, piece in board.pieces_dict.items():
-            file = animalchess.square_file(sq)
-            rank = animalchess.square_rank(sq)
+        # 遍历所有格子，使用位板实现的 piece_at() 方法
+        for sq in jc.SQUARES:
+            piece = board.piece_at(sq)
+            if piece is None:
+                continue
+                
+            file = jc.square_file(sq)
+            rank = jc.square_rank(sq)
             
             x = file * SQUARE_SIZE + margin + SQUARE_SIZE / 2  # 从左到右：a-g
             y = (8 - rank) * SQUARE_SIZE + margin + SQUARE_SIZE / 2
             
             # 棋子圆形背景
-            color_fill = "#DC143C" if piece.color == animalchess.WHITE else "#000"
+            color_fill = "#DC143C" if piece.color == jc.WHITE else "#000"
             ET.SubElement(svg, "circle", {
                 "cx": str(x),
                 "cy": str(y),
@@ -178,7 +183,7 @@ def board(board: Optional[animalchess.Board] = None,
     return SvgWrapper(ET.tostring(svg, encoding="unicode"))
 
 
-def piece(piece: animalchess.Piece, size: Optional[int] = None) -> str:
+def piece(piece: jc.Piece, size: Optional[int] = None) -> str:
     """Renders a single piece as SVG."""
     svg = ET.Element("svg", {
         "xmlns": "http://www.w3.org/2000/svg",
@@ -190,7 +195,7 @@ def piece(piece: animalchess.Piece, size: Optional[int] = None) -> str:
         svg.set("width", str(size))
         svg.set("height", str(size))
     
-    color_fill = "#DC143C" if piece.color == animalchess.WHITE else "#000"
+    color_fill = "#DC143C" if piece.color == jc.WHITE else "#000"
     
     ET.SubElement(svg, "circle", {
         "cx": str(SQUARE_SIZE / 2),

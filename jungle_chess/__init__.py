@@ -103,6 +103,100 @@ WHITE_DEN = D1    # 白方兽穴 (底部中央)
 BLACK_DEN = D9    # 黑方兽穴 (顶部中央)
 
 
+# === 7x9 Bitboard 定义与掩码 ===
+Bitboard = int
+BB_EMPTY: Bitboard = 0
+BB_ALL: Bitboard = (1 << 63) - 1  # 7*9 = 63 格
+
+# 每格单比特掩码
+BB_SQUARES: List[Bitboard] = [1 << sq for sq in SQUARES]
+
+# 按列/按行掩码
+BB_FILES: List[Bitboard] = [
+    sum(BB_SQUARES[sq] for sq in SQUARES if square_file(sq) == f)
+    for f in range(7)
+]
+
+BB_RANKS: List[Bitboard] = [
+    sum(BB_SQUARES[sq] for sq in SQUARES if square_rank(sq) == r)
+    for r in range(9)
+]
+
+# 特殊地形掩码
+def bb_from_squares(squares: Iterable[Square]) -> Bitboard:
+    mask: Bitboard = BB_EMPTY
+    for sq in squares:
+        mask |= BB_SQUARES[sq]
+    return mask
+
+BB_RIVER: Bitboard = bb_from_squares(RIVER_SQUARES)
+BB_WHITE_TRAPS: Bitboard = bb_from_squares(WHITE_TRAPS)
+BB_BLACK_TRAPS: Bitboard = bb_from_squares(BLACK_TRAPS)
+BB_WHITE_DEN: Bitboard = BB_SQUARES[WHITE_DEN]
+BB_BLACK_DEN: Bitboard = BB_SQUARES[BLACK_DEN]
+
+# 基础位操作与遍历
+def popcount(bb: Bitboard) -> int:
+    return int(bb.bit_count())
+
+def lsb(bb: Bitboard) -> int:
+    return (bb & -bb).bit_length() - 1
+
+def msb(bb: Bitboard) -> int:
+    return bb.bit_length() - 1
+
+def scan_forward(bb: Bitboard) -> Iterator[Square]:
+    while bb:
+        r = bb & -bb
+        yield r.bit_length() - 1
+        bb ^= r
+
+def scan_reversed(bb: Bitboard) -> Iterator[Square]:
+    while bb:
+        r = bb.bit_length() - 1
+        yield r
+        bb ^= BB_SQUARES[r]
+
+
+class SquareSet:
+    """7x9 位板集合的轻量封装。"""
+
+    def __init__(self, squares: Union[int, Iterable[Square]] = BB_EMPTY) -> None:
+        try:
+            self.mask: Bitboard = int(squares) & BB_ALL  # type: ignore[arg-type]
+            return
+        except Exception:
+            self.mask = BB_EMPTY
+        for sq in typing.cast(Iterable[Square], squares):  # type: ignore[arg-type]
+            self.add(sq)
+
+    def __contains__(self, square: Square) -> bool:
+        return bool(BB_SQUARES[square] & self.mask)
+
+    def __iter__(self) -> Iterator[Square]:
+        return scan_forward(self.mask)
+
+    def __len__(self) -> int:
+        return popcount(self.mask)
+
+    def add(self, square: Square) -> None:
+        self.mask |= BB_SQUARES[square]
+
+    def discard(self, square: Square) -> None:
+        self.mask &= ~BB_SQUARES[square]
+
+    def tolist(self) -> List[bool]:
+        result = [False] * 63
+        for sq in self:
+            result[sq] = True
+        return result
+
+    def __int__(self) -> int:
+        return self.mask
+
+    def __repr__(self) -> str:
+        return f"SquareSet({self.mask:#018x})"
+
 class Piece:
     """A piece with type and color."""
 
@@ -129,6 +223,10 @@ class Piece:
 
     def __str__(self) -> str:
         return self.symbol()
+
+    def _repr_svg_(self) -> str:
+        import jungle_chess.svg
+        return jungle_chess.svg.piece(self, size=45)
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Piece):
@@ -195,20 +293,333 @@ class Move:
         return cls(0, 0)
 
 
+BaseBoardT = TypeVar("BaseBoardT", bound="BaseBoard")
+
+
+class BaseBoard:
+    """
+    基础棋盘类，使用位板表示棋子位置。
+    不包含移动生成等高级功能，仅提供棋盘状态的基本操作。
+    """
+
+    def __init__(self, fen: Optional[str] = STARTING_FEN) -> None:
+        # 各类棋子的位板
+        self.rats: Bitboard = BB_EMPTY
+        self.cats: Bitboard = BB_EMPTY
+        self.dogs: Bitboard = BB_EMPTY
+        self.wolves: Bitboard = BB_EMPTY
+        self.leopards: Bitboard = BB_EMPTY
+        self.tigers: Bitboard = BB_EMPTY
+        self.lions: Bitboard = BB_EMPTY
+        self.elephants: Bitboard = BB_EMPTY
+
+        # 颜色占用位板
+        self.occupied_co: List[Bitboard] = [BB_EMPTY, BB_EMPTY]
+        self.occupied: Bitboard = BB_EMPTY
+
+        if fen is None:
+            self._clear_board()
+        elif fen == STARTING_FEN:
+            self._reset_board()
+        else:
+            self._set_board_fen(fen)
+
+    def _reset_board(self) -> None:
+        """重置到初始局面。"""
+        self._clear_board()
+        
+        # 白方棋子 (底部)
+        self._set_piece_at(A1, LION, WHITE)
+        self._set_piece_at(G1, TIGER, WHITE)
+        self._set_piece_at(B2, DOG, WHITE)
+        self._set_piece_at(F2, CAT, WHITE)
+        self._set_piece_at(A3, RAT, WHITE)
+        self._set_piece_at(C3, LEOPARD, WHITE)
+        self._set_piece_at(E3, WOLF, WHITE)
+        self._set_piece_at(G3, ELEPHANT, WHITE)
+        
+        # 黑方棋子 (顶部)
+        self._set_piece_at(A7, ELEPHANT, BLACK)
+        self._set_piece_at(C7, WOLF, BLACK)
+        self._set_piece_at(E7, LEOPARD, BLACK)
+        self._set_piece_at(G7, RAT, BLACK)
+        self._set_piece_at(B8, CAT, BLACK)
+        self._set_piece_at(F8, DOG, BLACK)
+        self._set_piece_at(A9, TIGER, BLACK)
+        self._set_piece_at(G9, LION, BLACK)
+
+    def reset_board(self) -> None:
+        """重置棋盘到初始位置。"""
+        self._reset_board()
+
+    def _clear_board(self) -> None:
+        """清空棋盘。"""
+        self.rats = BB_EMPTY
+        self.cats = BB_EMPTY
+        self.dogs = BB_EMPTY
+        self.wolves = BB_EMPTY
+        self.leopards = BB_EMPTY
+        self.tigers = BB_EMPTY
+        self.lions = BB_EMPTY
+        self.elephants = BB_EMPTY
+
+        self.occupied_co[WHITE] = BB_EMPTY
+        self.occupied_co[BLACK] = BB_EMPTY
+        self.occupied = BB_EMPTY
+
+    def clear_board(self) -> None:
+        """清空棋盘。"""
+        self._clear_board()
+
+    def pieces_mask(self, piece_type: PieceType, color: Color) -> Bitboard:
+        """获取指定类型和颜色的棋子位板。"""
+        if piece_type == RAT:
+            bb = self.rats
+        elif piece_type == CAT:
+            bb = self.cats
+        elif piece_type == DOG:
+            bb = self.dogs
+        elif piece_type == WOLF:
+            bb = self.wolves
+        elif piece_type == LEOPARD:
+            bb = self.leopards
+        elif piece_type == TIGER:
+            bb = self.tigers
+        elif piece_type == LION:
+            bb = self.lions
+        elif piece_type == ELEPHANT:
+            bb = self.elephants
+        else:
+            bb = BB_EMPTY
+
+        return bb & self.occupied_co[color]
+
+    def pieces(self, piece_type: PieceType, color: Color) -> SquareSet:
+        """获取指定类型和颜色的棋子集合。"""
+        return SquareSet(self.pieces_mask(piece_type, color))
+
+    def piece_at(self, square: Square) -> Optional[Piece]:
+        """获取指定位置的棋子。"""
+        piece_type = self.piece_type_at(square)
+        if piece_type:
+            mask = BB_SQUARES[square]
+            color = bool(self.occupied_co[WHITE] & mask)
+            return Piece(piece_type, color)
+        return None
+
+    def piece_type_at(self, square: Square) -> Optional[PieceType]:
+        """获取指定位置的棋子类型。"""
+        mask = BB_SQUARES[square]
+
+        if not self.occupied & mask:
+            return None
+        elif self.rats & mask:
+            return RAT
+        elif self.cats & mask:
+            return CAT
+        elif self.dogs & mask:
+            return DOG
+        elif self.wolves & mask:
+            return WOLF
+        elif self.leopards & mask:
+            return LEOPARD
+        elif self.tigers & mask:
+            return TIGER
+        elif self.lions & mask:
+            return LION
+        elif self.elephants & mask:
+            return ELEPHANT
+        else:
+            return None
+
+    def color_at(self, square: Square) -> Optional[Color]:
+        """获取指定位置棋子的颜色。"""
+        mask = BB_SQUARES[square]
+        if self.occupied_co[WHITE] & mask:
+            return WHITE
+        elif self.occupied_co[BLACK] & mask:
+            return BLACK
+        return None
+
+    def _remove_piece_at(self, square: Square) -> Optional[PieceType]:
+        """移除指定位置的棋子（内部方法）。"""
+        piece_type = self.piece_type_at(square)
+        mask = BB_SQUARES[square]
+
+        if piece_type == RAT:
+            self.rats ^= mask
+        elif piece_type == CAT:
+            self.cats ^= mask
+        elif piece_type == DOG:
+            self.dogs ^= mask
+        elif piece_type == WOLF:
+            self.wolves ^= mask
+        elif piece_type == LEOPARD:
+            self.leopards ^= mask
+        elif piece_type == TIGER:
+            self.tigers ^= mask
+        elif piece_type == LION:
+            self.lions ^= mask
+        elif piece_type == ELEPHANT:
+            self.elephants ^= mask
+        else:
+            return None
+
+        self.occupied ^= mask
+        self.occupied_co[WHITE] &= ~mask
+        self.occupied_co[BLACK] &= ~mask
+
+        return piece_type
+
+    def remove_piece_at(self, square: Square) -> Optional[Piece]:
+        """移除并返回指定位置的棋子。"""
+        color = bool(self.occupied_co[WHITE] & BB_SQUARES[square])
+        piece_type = self._remove_piece_at(square)
+        return Piece(piece_type, color) if piece_type else None
+
+    def _set_piece_at(self, square: Square, piece_type: PieceType, color: Color) -> None:
+        """在指定位置放置棋子（内部方法）。"""
+        self._remove_piece_at(square)
+
+        mask = BB_SQUARES[square]
+
+        if piece_type == RAT:
+            self.rats |= mask
+        elif piece_type == CAT:
+            self.cats |= mask
+        elif piece_type == DOG:
+            self.dogs |= mask
+        elif piece_type == WOLF:
+            self.wolves |= mask
+        elif piece_type == LEOPARD:
+            self.leopards |= mask
+        elif piece_type == TIGER:
+            self.tigers |= mask
+        elif piece_type == LION:
+            self.lions |= mask
+        elif piece_type == ELEPHANT:
+            self.elephants |= mask
+        else:
+            return
+
+        self.occupied ^= mask
+        self.occupied_co[color] ^= mask
+
+    def set_piece_at(self, square: Square, piece: Optional[Piece]) -> None:
+        """在指定位置设置棋子。"""
+        if piece is None:
+            self._remove_piece_at(square)
+        else:
+            self._set_piece_at(square, piece.piece_type, piece.color)
+
+    def _set_board_fen(self, fen: str) -> None:
+        """从FEN字符串设置棋盘（内部方法）。"""
+        parts = fen.split()
+        board_part = parts[0] if parts else fen
+        
+        self._clear_board()
+        
+        ranks = board_part.split("/")
+        for rank_idx, rank_str in enumerate(ranks):
+            file_idx = 0
+            for char in rank_str:
+                if char.isdigit():
+                    file_idx += int(char)
+                else:
+                    sq = square(file_idx, 8 - rank_idx)
+                    piece = Piece.from_symbol(char)
+                    self._set_piece_at(sq, piece.piece_type, piece.color)
+                    file_idx += 1
+
+    def copy(self: BaseBoardT) -> BaseBoardT:
+        """创建棋盘的副本。"""
+        board = type(self)(None)
+
+        board.rats = self.rats
+        board.cats = self.cats
+        board.dogs = self.dogs
+        board.wolves = self.wolves
+        board.leopards = self.leopards
+        board.tigers = self.tigers
+        board.lions = self.lions
+        board.elephants = self.elephants
+
+        board.occupied_co[WHITE] = self.occupied_co[WHITE]
+        board.occupied_co[BLACK] = self.occupied_co[BLACK]
+        board.occupied = self.occupied
+
+        return board
+
+    def __copy__(self: BaseBoardT) -> BaseBoardT:
+        return self.copy()
+
+    @classmethod
+    def empty(cls: Type[BaseBoardT]) -> BaseBoardT:
+        """创建空棋盘。"""
+        return cls(None)
+
+
 BoardT = TypeVar("BoardT", bound="Board")
 
 
-class Board:
+class _BoardState:
+    """保存棋盘状态的快照，用于push/pop操作。"""
+
+    def __init__(self, board: "Board") -> None:
+        # 保存所有棋子位板
+        self.rats = board.rats
+        self.cats = board.cats
+        self.dogs = board.dogs
+        self.wolves = board.wolves
+        self.leopards = board.leopards
+        self.tigers = board.tigers
+        self.lions = board.lions
+        self.elephants = board.elephants
+
+        # 保存占用位板
+        self.occupied_w = board.occupied_co[WHITE]
+        self.occupied_b = board.occupied_co[BLACK]
+        self.occupied = board.occupied
+
+        # 保存游戏状态
+        self.turn = board.turn
+        self.halfmove_clock = board.halfmove_clock
+        self.fullmove_number = board.fullmove_number
+
+    def restore(self, board: "Board") -> None:
+        """恢复棋盘状态。"""
+        board.rats = self.rats
+        board.cats = self.cats
+        board.dogs = self.dogs
+        board.wolves = self.wolves
+        board.leopards = self.leopards
+        board.tigers = self.tigers
+        board.lions = self.lions
+        board.elephants = self.elephants
+
+        board.occupied_co[WHITE] = self.occupied_w
+        board.occupied_co[BLACK] = self.occupied_b
+        board.occupied = self.occupied
+
+        board.turn = self.turn
+        board.halfmove_clock = self.halfmove_clock
+        board.fullmove_number = self.fullmove_number
+
+
+class Board(BaseBoard):
     """
     Animal Chess board with move generation and validation.
+    继承自 BaseBoard，增加移动生成、游戏规则等高级功能。
     """
 
     starting_fen = STARTING_FEN
 
     def __init__(self, fen: Optional[str] = STARTING_FEN) -> None:
-        self.pieces_dict: Dict[Square, Piece] = {}
+        BaseBoard.__init__(self, None)
+        
         self.turn = WHITE
         self.move_stack: List[Move] = []
+        self._stack: List[_BoardState] = []
         self.halfmove_clock = 0
         self.fullmove_number = 1
 
@@ -221,51 +632,66 @@ class Board:
 
     def reset(self) -> None:
         """Restores the starting position."""
-        self.clear()
         self.turn = WHITE
         self.halfmove_clock = 0
         self.fullmove_number = 1
-        
-        # 设置白方棋子 (底部，rank 0-2)
-        self.set_piece_at(A1, Piece(LION, WHITE))
-        self.set_piece_at(G1, Piece(TIGER, WHITE))
-        self.set_piece_at(B2, Piece(DOG, WHITE))
-        self.set_piece_at(F2, Piece(CAT, WHITE))
-        self.set_piece_at(A3, Piece(RAT, WHITE))
-        self.set_piece_at(C3, Piece(LEOPARD, WHITE))
-        self.set_piece_at(E3, Piece(WOLF, WHITE))
-        self.set_piece_at(G3, Piece(ELEPHANT, WHITE))
-        
-        # 设置黑方棋子 (顶部，rank 6-8)
-        self.set_piece_at(A7, Piece(ELEPHANT, BLACK))
-        self.set_piece_at(C7, Piece(WOLF, BLACK))
-        self.set_piece_at(E7, Piece(LEOPARD, BLACK))
-        self.set_piece_at(G7, Piece(RAT, BLACK))
-        self.set_piece_at(B8, Piece(CAT, BLACK))
-        self.set_piece_at(F8, Piece(DOG, BLACK))
-        self.set_piece_at(A9, Piece(TIGER, BLACK))
-        self.set_piece_at(G9, Piece(LION, BLACK))
+        self.reset_board()
+        self.clear_stack()
 
     def clear(self) -> None:
         """Clears the board."""
-        self.pieces_dict.clear()
         self.turn = WHITE
+        self.halfmove_clock = 0
+        self.fullmove_number = 1
+        self.clear_board()
+        self.clear_stack()
+
+    def clear_stack(self) -> None:
+        """清空移动栈。"""
         self.move_stack.clear()
+        self._stack.clear()
 
-    def piece_at(self, square: Square) -> Optional[Piece]:
-        """Gets the piece at the given square."""
-        return self.pieces_dict.get(square)
-
-    def set_piece_at(self, square: Square, piece: Optional[Piece]) -> None:
-        """Sets a piece at the given square."""
-        if piece is None:
-            self.pieces_dict.pop(square, None)
+    def root(self) -> "Board":
+        """返回根局面的副本。"""
+        if self._stack:
+            board = type(self)(None)
+            self._stack[0].restore(board)
+            return board
         else:
-            self.pieces_dict[square] = piece
+            return self.copy(stack=False)
 
     def remove_piece_at(self, square: Square) -> Optional[Piece]:
-        """Removes and returns the piece at the given square."""
-        return self.pieces_dict.pop(square, None)
+        """移除棋子并清空移动栈。"""
+        piece = super().remove_piece_at(square)
+        self.clear_stack()
+        return piece
+
+    def set_piece_at(self, square: Square, piece: Optional[Piece]) -> None:
+        """设置棋子并清空移动栈。"""
+        super().set_piece_at(square, piece)
+        self.clear_stack()
+
+    def _board_state(self) -> _BoardState:
+        """创建当前棋盘状态的快照。"""
+        return _BoardState(self)
+
+    def peek(self) -> Move:
+        """
+        获取最后一步移动（不弹出）。
+        
+        :raises: IndexError 如果移动栈为空。
+        """
+        return self.move_stack[-1]
+
+    @property
+    def pseudo_legal_moves(self) -> "PseudoLegalMoveGenerator":
+        """返回伪合法移动生成器。"""
+        return PseudoLegalMoveGenerator(self)
+
+    @property
+    def legal_moves(self) -> "LegalMoveGenerator":
+        """返回合法移动生成器（斗兽棋中与伪合法相同）。"""
+        return LegalMoveGenerator(self)
 
     def is_river(self, square: Square) -> bool:
         """Checks if square is in river."""
@@ -438,14 +864,21 @@ class Board:
         return move in list(self.generate_pseudo_legal_moves())
 
     def push(self, move: Move) -> None:
-        """Makes a move."""
+        """Makes a move and saves board state."""
+        # 保存当前状态到栈
+        board_state = self._board_state()
+        self._stack.append(board_state)
+        self.move_stack.append(move)
+        
+        # 执行移动（使用父类方法避免清空栈）
         piece = self.piece_at(move.from_square)
         captured = self.piece_at(move.to_square)
         
-        self.set_piece_at(move.to_square, piece)
-        self.set_piece_at(move.from_square, None)
+        # 直接调用 BaseBoard 的方法，不触发 clear_stack
+        BaseBoard.set_piece_at(self, move.to_square, piece)
+        BaseBoard.set_piece_at(self, move.from_square, None)
         
-        self.move_stack.append(move)
+        # 更新游戏状态
         self.turn = not self.turn
         
         if captured:
@@ -457,30 +890,29 @@ class Board:
             self.fullmove_number += 1
 
     def pop(self) -> Move:
-        """Unmakes the last move."""
+        """Unmakes the last move by restoring previous state."""
         if not self.move_stack:
             raise IndexError("Move stack is empty")
         
         move = self.move_stack.pop()
-        # 简化版：不恢复被吃的棋子
-        piece = self.piece_at(move.to_square)
-        self.set_piece_at(move.from_square, piece)
-        self.set_piece_at(move.to_square, None)
-        
-        self.turn = not self.turn
+        self._stack.pop().restore(self)
         return move
 
     def is_game_over(self) -> bool:
         """Checks if the game is over."""
-        # 检查是否有棋子进入对方兽穴
-        enemy_den = BLACK_DEN if self.turn == WHITE else WHITE_DEN
-        piece_in_den = self.piece_at(enemy_den)
-        if piece_in_den and piece_in_den.color == self.turn:
+        # 检查是否有棋子进入己方兽穴（对方获胜）
+        # 如果当前是白方走棋，检查白方兽穴是否有黑方棋子
+        # 如果当前是黑方走棋，检查黑方兽穴是否有白方棋子
+        own_den = WHITE_DEN if self.turn == WHITE else BLACK_DEN
+        piece_in_den = self.piece_at(own_den)
+        if piece_in_den and piece_in_den.color != self.turn:
             return True
         
-        # 检查对方是否还有棋子
+        # 检查对方是否还有棋子（使用位板）
+        # 如果当前是白方走棋，检查黑方是否还有棋子
+        # 如果当前是黑方走棋，检查白方是否还有棋子
         enemy_color = not self.turn
-        has_enemy_pieces = any(p.color == enemy_color for p in self.pieces_dict.values())
+        has_enemy_pieces = bool(self.occupied_co[enemy_color])
         if not has_enemy_pieces:
             return True
         
@@ -491,14 +923,18 @@ class Board:
         if not self.is_game_over():
             return "*"
         
-        enemy_den = BLACK_DEN if self.turn == WHITE else WHITE_DEN
-        piece_in_den = self.piece_at(enemy_den)
-        if piece_in_den and piece_in_den.color == self.turn:
-            return "1-0" if self.turn == WHITE else "0-1"
+        # 检查是否有棋子进入己方兽穴（对方获胜）
+        own_den = WHITE_DEN if self.turn == WHITE else BLACK_DEN
+        piece_in_den = self.piece_at(own_den)
+        if piece_in_den and piece_in_den.color != self.turn:
+            # 对方棋子进入己方兽穴，对方获胜
+            return "1-0" if piece_in_den.color == WHITE else "0-1"
         
+        # 检查对方是否还有棋子（使用位板）
         enemy_color = not self.turn
-        has_enemy_pieces = any(p.color == enemy_color for p in self.pieces_dict.values())
+        has_enemy_pieces = bool(self.occupied_co[enemy_color])
         if not has_enemy_pieces:
+            # 对方无子，当前走棋方获胜
             return "1-0" if self.turn == WHITE else "0-1"
         
         return "*"
@@ -617,16 +1053,76 @@ class Board:
             lines.append(" ".join(line))
         return "\n".join(lines)
 
-    def copy(self) -> "Board":
+    def copy(self, *, stack: bool = True) -> "Board":
         """Creates a copy of the board."""
-        board = type(self)(None)
-        board.pieces_dict = self.pieces_dict.copy()
+        board = super().copy()
+        
         board.turn = self.turn
-        board.move_stack = self.move_stack.copy()
         board.halfmove_clock = self.halfmove_clock
         board.fullmove_number = self.fullmove_number
+        
+        if stack:
+            board.move_stack = self.move_stack.copy()
+            board._stack = self._stack.copy()
+        else:
+            board.move_stack = []
+            board._stack = []
+        
         return board
 
     def __repr__(self) -> str:
         return f"Board({self.fen()!r})"
 
+
+class PseudoLegalMoveGenerator:
+    """伪合法移动生成器。"""
+
+    def __init__(self, board: Board) -> None:
+        self.board = board
+
+    def __bool__(self) -> bool:
+        """检查是否有任何伪合法移动。"""
+        return any(self.board.generate_pseudo_legal_moves())
+
+    def count(self) -> int:
+        """统计伪合法移动数量。"""
+        return len(list(self))
+
+    def __iter__(self) -> Iterator[Move]:
+        """迭代所有伪合法移动。"""
+        return self.board.generate_pseudo_legal_moves()
+
+    def __contains__(self, move: Move) -> bool:
+        """检查移动是否伪合法。"""
+        return self.board.is_legal(move)
+
+    def __repr__(self) -> str:
+        moves = ", ".join(move.uci() for move in self)
+        return f"<PseudoLegalMoveGenerator at {id(self):#x} ({moves})>"
+
+
+class LegalMoveGenerator:
+    """合法移动生成器（斗兽棋中与伪合法相同）。"""
+
+    def __init__(self, board: Board) -> None:
+        self.board = board
+
+    def __bool__(self) -> bool:
+        """检查是否有任何合法移动。"""
+        return any(self.board.generate_pseudo_legal_moves())
+
+    def count(self) -> int:
+        """统计合法移动数量。"""
+        return len(list(self))
+
+    def __iter__(self) -> Iterator[Move]:
+        """迭代所有合法移动。"""
+        return self.board.generate_pseudo_legal_moves()
+
+    def __contains__(self, move: Move) -> bool:
+        """检查移动是否合法。"""
+        return self.board.is_legal(move)
+
+    def __repr__(self) -> str:
+        moves = ", ".join(move.uci() for move in self)
+        return f"<LegalMoveGenerator at {id(self):#x} ({moves})>"
