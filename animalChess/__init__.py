@@ -52,7 +52,6 @@ def piece_symbol(piece_type: PieceType) -> str:
 def piece_name(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_NAMES[piece_type])
 
-# TODO: find symbols(optional?)
 UNICODE_PIECE_SYMBOLS = {
     "E": "🐘", "e": "🐘",  # Elephant
     "L": "🦁", "l": "🦁",  # Lion (狮)
@@ -69,11 +68,11 @@ FILE_NAMES = ["a", "b", "c", "d", "e", "f", "g"]
 RANK_NAMES = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 # TODO: Starting Fen
-STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+STARTING_FEN = "t5l/1c3d1/e1w1c1m/7/7/7/M1C1W1E/1D3C1/L5T w KQkq - 0 1"
 """The FEN for the standard chess starting position."""
 
 # TODO: Starting Board Fen
-STARTING_BOARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+STARTING_BOARD_FEN = "t5l/1c3d1/e1w1c1m/7/7/7/M1C1W1E/1D3C1/L5T"
 """The board part of the FEN for the standard chess starting position."""
 
 # TODO: Status
@@ -232,8 +231,7 @@ BB_BACKRANKS = BB_RANK_1 | BB_RANK_9
 
 def lsb(bb: Bitboard) -> int:
     """
-    最低有效位的索引?
-    TODO: 能否保留?
+    最低有效位的索引
     """
     return (bb & -bb).bit_length() - 1
 
@@ -259,52 +257,52 @@ except AttributeError:
     def popcount(bb: Bitboard) -> int:
         return bin(bb).count("1")
 
-def flip_vertical(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
-    bb = ((bb >> 8) & 0x00ff_00ff_00ff_00ff) | ((bb & 0x00ff_00ff_00ff_00ff) << 8)
-    bb = ((bb >> 16) & 0x0000_ffff_0000_ffff) | ((bb & 0x0000_ffff_0000_ffff) << 16)
-    bb = (bb >> 32) | ((bb & 0x0000_0000_ffff_ffff) << 32)
-    return bb
-
-def flip_horizontal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#MirrorHorizontally
-    bb = ((bb >> 1) & 0x5555_5555_5555_5555) | ((bb & 0x5555_5555_5555_5555) << 1)
-    bb = ((bb >> 2) & 0x3333_3333_3333_3333) | ((bb & 0x3333_3333_3333_3333) << 2)
-    bb = ((bb >> 4) & 0x0f0f_0f0f_0f0f_0f0f) | ((bb & 0x0f0f_0f0f_0f0f_0f0f) << 4)
-    return bb
-
-def flip_diagonal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheDiagonal
-    t = (bb ^ (bb << 28)) & 0x0f0f_0f0f_0000_0000
-    bb = bb ^ (t ^ (t >> 28))
-    t = (bb ^ (bb << 14)) & 0x3333_0000_3333_0000
-    bb = bb ^ (t ^ (t >> 14))
-    t = (bb ^ (bb << 7)) & 0x5500_5500_5500_5500
-    bb = bb ^ (t ^ (t >> 7))
-    return bb
-
-def flip_anti_diagonal(bb: Bitboard) -> Bitboard:
-    # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheAntidiagonal
-    t = bb ^ (bb << 36)
-    bb = bb ^ ((t ^ (bb >> 36)) & 0xf0f0_f0f0_0f0f_0f0f)
-    t = (bb ^ (bb << 18)) & 0xcccc_0000_cccc_0000
-    bb = bb ^ (t ^ (t >> 18))
-    t = (bb ^ (bb << 9)) & 0xaa00_aa00_aa00_aa00
-    bb = bb ^ (t ^ (t >> 9))
-    return bb
+# def flip_vertical(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipVertically
+#     bb = ((bb >> 8) & 0x00ff_00ff_00ff_00ff) | ((bb & 0x00ff_00ff_00ff_00ff) << 8)
+#     bb = ((bb >> 16) & 0x0000_ffff_0000_ffff) | ((bb & 0x0000_ffff_0000_ffff) << 16)
+#     bb = (bb >> 32) | ((bb & 0x0000_0000_ffff_ffff) << 32)
+#     return bb
+#
+# def flip_horizontal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#MirrorHorizontally
+#     bb = ((bb >> 1) & 0x5555_5555_5555_5555) | ((bb & 0x5555_5555_5555_5555) << 1)
+#     bb = ((bb >> 2) & 0x3333_3333_3333_3333) | ((bb & 0x3333_3333_3333_3333) << 2)
+#     bb = ((bb >> 4) & 0x0f0f_0f0f_0f0f_0f0f) | ((bb & 0x0f0f_0f0f_0f0f_0f0f) << 4)
+#     return bb
+#
+# def flip_diagonal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheDiagonal
+#     t = (bb ^ (bb << 28)) & 0x0f0f_0f0f_0000_0000
+#     bb = bb ^ (t ^ (t >> 28))
+#     t = (bb ^ (bb << 14)) & 0x3333_0000_3333_0000
+#     bb = bb ^ (t ^ (t >> 14))
+#     t = (bb ^ (bb << 7)) & 0x5500_5500_5500_5500
+#     bb = bb ^ (t ^ (t >> 7))
+#     return bb
+#
+# def flip_anti_diagonal(bb: Bitboard) -> Bitboard:
+#     # https://www.chessprogramming.org/Flipping_Mirroring_and_Rotating#FlipabouttheAntidiagonal
+#     t = bb ^ (bb << 36)
+#     bb = bb ^ ((t ^ (bb >> 36)) & 0xf0f0_f0f0_0f0f_0f0f)
+#     t = (bb ^ (bb << 18)) & 0xcccc_0000_cccc_0000
+#     bb = bb ^ (t ^ (t >> 18))
+#     t = (bb ^ (bb << 9)) & 0xaa00_aa00_aa00_aa00
+#     bb = bb ^ (t ^ (t >> 9))
+#     return bb
 
 
 def shift_down(b: Bitboard) -> Bitboard:
-    return b >> 8
+    return b >> 7
 
 def shift_2_down(b: Bitboard) -> Bitboard:
-    return b >> 16
+    return b >> 14
 
 def shift_up(b: Bitboard) -> Bitboard:
-    return (b << 8) & BB_ALL
+    return (b << 7) & BB_ALL
 
 def shift_2_up(b: Bitboard) -> Bitboard:
-    return (b << 16) & BB_ALL
+    return (b << 14) & BB_ALL
 
 def shift_right(b: Bitboard) -> Bitboard:
     return (b << 1) & ~BB_FILE_A & BB_ALL
@@ -313,22 +311,22 @@ def shift_2_right(b: Bitboard) -> Bitboard:
     return (b << 2) & ~BB_FILE_A & ~BB_FILE_B & BB_ALL
 
 def shift_left(b: Bitboard) -> Bitboard:
-    return (b >> 1) & ~BB_FILE_H
+    return (b >> 1) & ~BB_FILE_G
 
 def shift_2_left(b: Bitboard) -> Bitboard:
-    return (b >> 2) & ~BB_FILE_G & ~BB_FILE_H
+    return (b >> 2) & ~BB_FILE_F & ~BB_FILE_G
 
 def shift_up_left(b: Bitboard) -> Bitboard:
-    return (b << 7) & ~BB_FILE_H & BB_ALL
+    return (b << 6) & ~BB_FILE_G & BB_ALL
 
 def shift_up_right(b: Bitboard) -> Bitboard:
-    return (b << 9) & ~BB_FILE_A & BB_ALL
+    return (b << 8) & ~BB_FILE_A & BB_ALL
 
 def shift_down_left(b: Bitboard) -> Bitboard:
-    return (b >> 9) & ~BB_FILE_H
+    return (b >> 8) & ~BB_FILE_G
 
 def shift_down_right(b: Bitboard) -> Bitboard:
-    return (b >> 7) & ~BB_FILE_A
+    return (b >> 6) & ~BB_FILE_A
 
 
 def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
@@ -574,54 +572,50 @@ class BaseBoard:
             self._set_board_fen(board_fen)
 
     def _reset_board(self) -> None:
-        self.pawns = BB_RANK_2 | BB_RANK_7
-        self.knights = BB_B1 | BB_G1 | BB_B8 | BB_G8
-        self.bishops = BB_C1 | BB_F1 | BB_C8 | BB_F8
-        self.rooks = BB_CORNERS
-        self.queens = BB_D1 | BB_D8
-        self.kings = BB_E1 | BB_E8
-
-        self.promoted = BB_EMPTY
-
-        self.occupied_co[WHITE] = BB_RANK_1 | BB_RANK_2
-        self.occupied_co[BLACK] = BB_RANK_7 | BB_RANK_8
-        self.occupied = BB_RANK_1 | BB_RANK_2 | BB_RANK_7 | BB_RANK_8
+        self.mice = BB_A7 | BB_G3
+        self.hachimis = BB_B2 | BB_F8
+        self.dogs = BB_B8 | BB_F2
+        self.wolves = BB_C3 | BB_E7
+        self.cheetahs = BB_E3 | BB_C7
+        self.tigers = BB_A1 | BB_G9
+        self.lions = BB_G1 | BB_A9
+        self.elephants = BB_A3 | BB_G7
 
     def reset_board(self) -> None:
         """Resets piece positions to the starting position."""
         self._reset_board()
 
     def _clear_board(self) -> None:
-        self.pawns = BB_EMPTY
-        self.knights = BB_EMPTY
-        self.bishops = BB_EMPTY
-        self.rooks = BB_EMPTY
-        self.queens = BB_EMPTY
-        self.kings = BB_EMPTY
-
-        self.promoted = BB_EMPTY
-
-        self.occupied_co[WHITE] = BB_EMPTY
-        self.occupied_co[BLACK] = BB_EMPTY
-        self.occupied = BB_EMPTY
+        self.mice = BB_EMPTY
+        self.hachimis = BB_EMPTY
+        self.dogs = BB_EMPTY
+        self.wolves = BB_EMPTY
+        self.cheetahs = BB_EMPTY
+        self.tigers = BB_EMPTY
+        self.lions = BB_EMPTY
+        self.elephants = BB_EMPTY
 
     def clear_board(self) -> None:
         """Clears the board."""
         self._clear_board()
 
     def pieces_mask(self, piece_type: PieceType, color: Color) -> Bitboard:
-        if piece_type == PAWN:
-            bb = self.pawns
-        elif piece_type == KNIGHT:
-            bb = self.knights
-        elif piece_type == BISHOP:
-            bb = self.bishops
-        elif piece_type == ROOK:
-            bb = self.rooks
-        elif piece_type == QUEEN:
-            bb = self.queens
-        elif piece_type == KING:
-            bb = self.kings
+        if piece_type == MOUSE:
+            bb = self.mice
+        elif piece_type == HACHIMI:
+            bb = self.hachimis
+        elif piece_type == DOG:
+            bb = self.dogs
+        elif piece_type == WOLF:
+            bb = self.wolves
+        elif piece_type == CHEETAH:
+            bb = self.cheetahs
+        elif piece_type == TIGER:
+            bb = self.tigers
+        elif piece_type == LION:
+            bb = self.lions
+        elif piece_type == ELEPHANT:
+            bb = self.elephants
 
         return bb & self.occupied_co[color]
 
