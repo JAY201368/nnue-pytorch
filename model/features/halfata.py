@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 # import chess  # TODO: handcraft our own chess lib
-import animalChess as chess
+import animalChess_brutal as chess
 import torch
 
 from .feature_block import FeatureBlock
