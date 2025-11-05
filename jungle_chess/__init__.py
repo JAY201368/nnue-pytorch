@@ -23,7 +23,7 @@ COLOR_NAMES = ["black", "white"]
 # 棋子类型定义 (按等级从低到高)
 PieceType = int
 PIECE_TYPES = [RAT, CAT, DOG, WOLF, LEOPARD, TIGER, LION, ELEPHANT] = range(1, 9)
-PIECE_SYMBOLS = [None, "r", "c", "d", "w", "l", "t", "L", "e"]
+PIECE_SYMBOLS = [None, "r", "c", "d", "w", "p", "t", "l", "e"]
 PIECE_NAMES = [None, "rat", "cat", "dog", "wolf", "leopard", "tiger", "lion", "elephant"]
 PIECE_CHINESE = [None, "鼠", "猫", "狗", "狼", "豹", "虎", "狮", "象"]
 
