@@ -97,6 +97,7 @@ def gather_statistics_from_data(filename: str, count: int, bucket_size: int):
     Takes a .bin or .binpack file and produces perf% statistics
     The result is a dictionary of the form { eval : (perf%, count) }
     """
+    # TODO: 可能需要修改
     batch_size = 8192
     cyclic = True
     smart_fen_skipping = True

@@ -26,6 +26,7 @@ class NNUE(L.LightningModule):
     lr - the initial learning rate
     """
 
+    # TODO: 可能需要调整训练参数
     def __init__(
         self,
         feature_set: FeatureSet,
@@ -166,6 +167,7 @@ class NNUE(L.LightningModule):
         ]
 
         # 使用Ranger优化器(RAdam + LookAhead 变体配置)
+        # TODO: 优化器配置可能需要修改
         optimizer = ranger21.Ranger21(
             train_params,
             lr=1.0,

@@ -211,6 +211,7 @@ class NNUEWriter:
 
 
 class NNUEReader:
+    # TODO: 与网络结构相关, 可能需要修改
     def __init__(
         self,
         f: BinaryIO,

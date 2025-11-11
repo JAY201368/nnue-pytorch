@@ -22,6 +22,7 @@ class WeightClippingConfig(TypedDict):
 
 @dataclass
 class QuantizationConfig:
+    # TODO: 超参数可能需要修改
     nnue2score: float = 600.0
     weight_scale_hidden: float = 64.0
     weight_scale_out: float = 16.0
