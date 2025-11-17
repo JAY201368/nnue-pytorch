@@ -1,3 +1,6 @@
+"""
+分析训练数据中评估值 (eval) 与实际胜率（perf%）之间的关系，并用 sigmoid 函数拟合该关系，最终生成可视化图像
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit

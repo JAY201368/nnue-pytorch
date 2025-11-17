@@ -1,7 +1,7 @@
 #!/bin/bash
 
-
-python train.py data/large_gensfen_multipvdiff_100_d9.binpack \
+python train.py \
+    data/large_gensfen_multipvdiff_100_d9.binpack \
     --gpus 0 \
     --max_epochs 1 \
     --batch-size 16 \

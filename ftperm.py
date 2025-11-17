@@ -1,4 +1,10 @@
 """
+一套针对 NNUE 特征变换层 (Feature Transformer, FT) 的
+“激活矩阵收集 → 最优排列搜索 → 评估 → 应用”工具，
+核心目的是通过交换/旋转 L1 特征顺序，让每个 4 元块中的“零”更集中，从而提升前向推理的稀疏性与运行效率。
+"""
+
+"""
 
 NOTE: This script uses CUDA and may requires large amounts of VRAM. Decrease --count if encountering problems.
 
