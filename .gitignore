@@ -9,3 +9,7 @@ easy_train_data
 .DS_Store
 ./test.py
 .idea/
+temp/
+data/
+DockerConfig/
+logs_small_test/
