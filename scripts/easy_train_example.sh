@@ -1,6 +1,12 @@
+# 初始化 conda
+source "/home/test/Programs/anaconda3/etc/profile.d/conda.sh"
+
+# 激活 conda 环境s
+conda activate nnue
+
 python easy_train.py \
-    --training-dataset=/home/vondele/chess/vondele/gensfen/gensfen_2021_09_02/nodes5000pv2_UHO.binpack \
-    --validation-dataset=/home/vondele/chess/vondele/gensfen/gensfen_2021_09_02/nodes5000pv2_UHO.binpack \
+    --training-dataset=/home/vondele/chess/vondele/gensfen/gensfen_2021_09_02/nodes5000pv2_UHO.binpack \    # 替换
+    --validation-dataset=/home/vondele/chess/vondele/gensfen/gensfen_2021_09_02/nodes5000pv2_UHO.binpack \  # 替换
     --num-workers=4 \
     --threads=2 \
     --gpus="0," \
@@ -32,4 +38,4 @@ python easy_train.py \
     --experiment-name=test \
     --additional-training-arg="--auto_lr_find=False" \
     --additional-training-arg="--detect_anomaly=False" \
-    --features="HalfKAv2_hm^"
+    --features="HalfKAv2_hm^"  # 替换
