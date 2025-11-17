@@ -102,7 +102,7 @@ class FeatureSet:
         This method takes a feature idx and looks for the block that owns it.
         If it found the block it asks it to factorize the index, otherwise
         it throws and Exception. The idx must refer to a real feature.
-        输入一个实特征索引, 返回其所有因子化特征索引
+        输入一个实特征索引, 找到它所在的特征块并返回其所有因子化特征索引
         :param idx: real feature index
         :return: all factorized feature index
         """
@@ -124,6 +124,7 @@ class FeatureSet:
         slightly faster when there's many feature blocks. It might be worth
         to add a similar method to the FeatureBlock itself - to make it faster
         for feature blocks with many factors.
+        返回一个长度为num_real_features的列表, 列表的每个元素为该索引对应的实特征的因子下标的列表
         """
         indices = []
         real_offset = 0

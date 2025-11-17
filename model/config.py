@@ -3,7 +3,7 @@
 """
 from dataclasses import dataclass
 
-
+# TODO: 超参数需要修改
 # 3 layer fully connected network
 @dataclass
 class ModelConfig:

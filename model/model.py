@@ -17,7 +17,12 @@ from .quantize import QuantizationConfig, QuantizationManager
 
 # 线性层类
 class StackedLinear(nn.Module):
-    def __init__(self, in_features: int, out_features: int, count: int):
+    def __init__(
+            self,
+             in_features: int,
+             out_features: int,
+             count: int
+        ):
         """
         count -> 桶(并行计算的特征向量)的数量
         """
@@ -177,8 +182,8 @@ class NNUEModel(nn.Module):
         feature_set: FeatureSet,
         config: ModelConfig,
         quantize_config: QuantizationConfig,
-        num_psqt_buckets: int = 8,
-        num_ls_buckets: int = 8,
+        num_psqt_buckets: int = 8,  # TODO: 可能需要修改
+        num_ls_buckets: int = 8,    # TODO: 可能需要修改
     ):
         super().__init__()
 

@@ -367,6 +367,8 @@ struct HalfKAv2_hmFactorized {
     }
 };
 
+// TODO: 加上自建特征集
+
 /*
  * 特征集抽象类
 **/
@@ -1133,6 +1135,7 @@ extern "C" {
         {
             return new FeaturedBatchStream<FeatureSet<HalfKAv2_hmFactorized>, SparseBatch>(concurrency, filenames_vec, batch_size, cyclic, skipPredicate);
         }
+        // TODO: 加上自建特征集
         fprintf(stderr, "Unknown feature_set %s\n", feature_set_c);
         return nullptr;
     }

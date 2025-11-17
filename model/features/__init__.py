@@ -13,6 +13,7 @@ of feature block classes in that module.
 """
 from . import halfkp, halfka, halfka_v2, halfka_v2_hm
 
+# TODO: 为什么要保留多个特征集?
 _feature_modules: list[types.ModuleType] = [halfkp, halfka, halfka_v2, halfka_v2_hm]
 
 _feature_blocks_by_name: dict[str, FeatureBlock] = dict()
@@ -48,6 +49,7 @@ def get_available_feature_blocks_names() -> list[str]:
 
 
 def add_feature_args(parser: argparse.ArgumentParser) -> None:
+    # TODO: 更改默认特征集
     _default_feature_set_name = "HalfKAv2_hm^"
     parser.add_argument(
         "--features",

@@ -634,6 +634,7 @@ if __name__ == "__main__":
         return torch.mm(inputs, weight) + bias
 
     def test():
+        # TODO: 修改超参数
         BATCH_SIZE = 16
         INPUT_SIZE = 10
         MAX_ACTIVE_FEATURES = 32
@@ -685,6 +686,7 @@ if __name__ == "__main__":
         print("Tests passed.")
 
     def bench():
+        # TODO: 需要修改超参数
         INPUT_SIZE = 40960
         BATCH_SIZE = 8192
         ITERS = 64

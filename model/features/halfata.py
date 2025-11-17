@@ -51,7 +51,8 @@ def halfata_idx(
     return 1 + orient(is_white_pov, sq) + p_idx * NUM_SQ + attack_bucket * NUM_PLANES
 
 def classify_attack_bucket(board: chess.Board, color: bool) -> int:
-    # TODO: classify attack buckets
+    # TODO: 分类攻击桶(done)
+    # TODO: 需要库支持(用于获取当前棋盘上特定棋子的数量)
     mark = 0  # 激烈程度评分, 范围[0, 12]
     mark += len(board.pieces(chess.LION, color)) * 3
     mark += len(board.pieces(chess.TIGER, color)) * 3
@@ -75,7 +76,7 @@ def halfata_psqts():
         # chess.BISHOP: 825,
         # chess.ROOK: 1276,
         # chess.QUEEN: 2538,
-        # TODO: fill up piece-square table values of pieces
+        # TODO: 填写psqt子力值
         chess.HACHIMI: 0,
         chess.DOG: 0,
         chess.WOLF: 0,

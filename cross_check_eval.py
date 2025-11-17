@@ -72,7 +72,7 @@ def eval_model_batch(model, batch: data_loader.SparseBatchPtr):
             psqt_indices,
             layer_stack_indices,
         )
-        * 600.0
+        * 600.0  # magic number可能需要修改
     ]
     for i in range(len(evals)):
         if them[i] > 0.5:
@@ -85,7 +85,7 @@ re_nnue_eval = re.compile(r"NNUE evaluation:?\s*?([-+]?\d*?\.\d*)")
 
 def compute_basic_eval_stats(evals):
     min_engine_eval = min(evals)
-    max_engine_\eval = max(evals)
+    max_engine_eval = max(evals)
     avg_engine_eval = sum(evals) / len(evals)
     avg_abs_engine_eval = sum(abs(v) for v in evals) / len(evals)
 
@@ -140,7 +140,7 @@ def compute_correlation(engine_evals, model_evals):
     print("Max difference: {}".format(max_diff))
 
 
-d ef eval_engine_batch(engine_path, net_path, fens):
+def eval_engine_batch(engine_path, net_path, fens):
     engine = subprocess.Popen(
         [engine_path],
         stdin=subprocess.PIPE,
