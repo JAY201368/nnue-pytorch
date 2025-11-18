@@ -77,6 +77,7 @@ def make_data_loaders(
     # num_workers has to be 0 for sparse, and 1 for dense
     # it currently cannot work in parallel mode but it shouldn't need to
     train = DataLoader(
+        # FixedNumBatchesDataset做定长封装, 真正读取数据的仍是SparseBatchDataset
         data_loader.FixedNumBatchesDataset(
             train_infinite, (epoch_size + batch_size - 1) // batch_size  # 批次数向上取整
         ),
@@ -502,6 +503,7 @@ def main():
     if args.resume_from_checkpoint:
         trainer.fit(nnue, train, val, ckpt_path=args.resume_from_checkpoint)
     else:
+        # 拟合训练集
         trainer.fit(nnue, train, val)
 
     with open(os.path.join(logdir, "training_finished"), "w"):

@@ -80,6 +80,7 @@ class TrainingDataProvider:
         self.config = config
 
         if batch_size:
+            # 将参数传给stream.create_sparse_batch_stream, 构造SparseBatchStream流
             self.stream = self.create_stream(
                 self.feature_set,
                 self.num_workers,
@@ -97,9 +98,10 @@ class TrainingDataProvider:
         return self
 
     def __next__(self):
-        v = self.fetch_next(self.stream)
+        v = self.fetch_next(self.stream)  # 通过 stream.fetch_next_sparse_batch 取得 C++ 侧返回的 SparseBatch 指针
 
         if v:
+            # 将返回的SparseBatch指针转成PyTorch tensors
             tensors = v.contents.get_tensors("cpu")
             self.destroy_part(v)
             return tensors
@@ -111,6 +113,11 @@ class TrainingDataProvider:
 
 
 class SparseBatchProvider(TrainingDataProvider):
+    """
+    迭代器
+    继承自 TrainingDataProvider, 在构造函数里把特征集名称、文件列表、批大小等参数传给 stream.create_sparse_batch_stream, 
+    并且在 __next__ 中通过 stream.fetch_next_sparse_batch 取得 C++ 侧返回的 SparseBatch 指针, 再转成 PyTorch tensors
+    """
     def __init__(
         self,
         feature_set: str,
@@ -122,6 +129,7 @@ class SparseBatchProvider(TrainingDataProvider):
     ):
         super().__init__(
             feature_set,
+            # 将方法当做参数传入
             stream.create_sparse_batch_stream,
             stream.destroy_sparse_batch_stream,
             stream.fetch_next_sparse_batch,

@@ -368,9 +368,17 @@ struct HalfKAv2_hmFactorized {
 };
 
 // TODO: 加上自建特征集
+// struct HalfATA {
+//     // TODO
+// }
+
+// struct HalfATAFactorized {
+//     // TODO
+// }
 
 /*
  * 特征集抽象类
+ * 模板参数为特征集结构体
 **/
 template <typename T, typename... Ts>
 struct FeatureSet
@@ -393,14 +401,17 @@ struct SparseBatch
 {
     static constexpr bool IS_BATCH = true;
 
+    /**
+     * 模板参数为特征集结构体
+     */
     template <typename... Ts>
     SparseBatch(FeatureSet<Ts...>, const std::vector<TrainingDataEntry>& entries)
     {
         num_inputs = FeatureSet<Ts...>::INPUTS;  // 特征向量维数
-        size = entries.size();
+        size = entries.size();       // 单个批次内训练数据条目数量
         is_white = new float[size];  // 单批次内的训练数据是否为白色方 (为什么用float不用bool?)
-        outcome = new float[size];
-        score = new float[size];
+        outcome = new float[size];   // 批次内对局结果
+        score = new float[size];     // 批次内引擎分?
         white = new int[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];  // 白色方活跃特征下标
         black = new int[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];
         white_values = new float[size * FeatureSet<Ts...>::MAX_ACTIVE_FEATURES];  // 白色方活跃特征值
@@ -459,9 +470,9 @@ struct SparseBatch
 
 private:
 
-    /*
-     * 填写单条训练数据的信息
-    **/
+    /**
+     * 加载来自单条训练数据的信息
+     */
     template <typename... Ts>
     void fill_entry(FeatureSet<Ts...>, int i, const TrainingDataEntry& e)
     {
@@ -552,8 +563,8 @@ protected:
 
 /*
  * 创建一个名为 FeaturedBatchStream 的类。这个类的作用是：
- * 从文件中并行读取原始训练数据（比如棋谱）。
- * 使用多个后台工作线程将原始数据转换成“特征化”的数据（即模型可以理解的格式）。
+ * 从文件中并行读取原始训练数据
+ * 使用多个后台工作线程将原始数据转换成模型接收的特征
  * 将处理好的数据打包成一个个批次 (batch)。
  * 主训练程序可以简单地调用 next() 方法来获取一个准备好的数据批次，而不需要等待文件读取和数据处理，从而大大提高了数据供给效率，避免 GPU/CPU 在训练时空闲。
  * 这整个结构是一个经典的生产者-消费者模式 (Producer-Consumer Pattern)。
@@ -1037,6 +1048,7 @@ extern "C" {
         entries.reserve(num_fens);
         for (int i = 0; i < num_fens; ++i)
         {
+            // TODO: 调用了从fen构造position对象的方法, 需要修改
             auto& e = entries.emplace_back();    // 构造TrainingDataEntry对象
             e.pos = Position::fromFen(fens[i]);  // 用局面码还原出pos对象
             movegen::forEachLegalMove(e.pos, [&](Move m){e.move = m;});
@@ -1078,6 +1090,15 @@ extern "C" {
         {
             return new SparseBatch(FeatureSet<HalfKAv2_hmFactorized>{}, entries);
         }
+        // TODO
+        // else if (feature_set == "HalfATA")
+        // {
+        //     return new SparseBatch(FeatureSet<HalfATA>{}, entries);
+        // }
+        // else if (feature_set == "HalfATA^")
+        // {
+        //     return new SparseBatch(FeatureSet<HalfATAFactorized>{}, entries);
+        // }
         fprintf(stderr, "Unknown feature_set %s\n", feature_set_c);
         return nullptr;
     }
@@ -1136,6 +1157,14 @@ extern "C" {
             return new FeaturedBatchStream<FeatureSet<HalfKAv2_hmFactorized>, SparseBatch>(concurrency, filenames_vec, batch_size, cyclic, skipPredicate);
         }
         // TODO: 加上自建特征集
+        // else if (feature_set == "HalfATA")
+        // {
+        //     return new FeaturedBatchStream<FeatureSet<HalfATA>, SparseBatch>(concurrency, filenames_vec, batch_size, cyclic, skipPredicate);
+        // }
+        // else if (feature_set == "HalfATA^")
+        // {
+        //     return new FeaturedBatchStream<FeatureSet<HalfATAFactorized>, SparseBatch>(concurrency, filenames_vec, batch_size, cyclic, skipPredicate);
+        // }
         fprintf(stderr, "Unknown feature_set %s\n", feature_set_c);
         return nullptr;
     }
@@ -1217,6 +1246,7 @@ int main(int argc, char** argv)
         .simple_eval_skipping = 0,
         .param_index = 0
     };
+    // TODO: 修改特征集
     auto stream = create_sparse_batch_stream("HalfKAv2_hm^", concurrency, file_count, files, batch_size, cyclic, config);
 
     auto t0 = std::chrono::high_resolution_clock::now();

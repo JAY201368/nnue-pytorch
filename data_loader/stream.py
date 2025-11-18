@@ -9,6 +9,10 @@ def _to_c_str_array(str_list):
     c_str_array[:] = [s.encode("utf-8") for s in str_list]
     return c_str_array
 
+"""
+几个create/destroy方法: 对 _native.c_lib.dll 上相应符号的薄封装, 
+把Python的字符串数组和skip配置打包成C端参数, 然后直接调用共享库里的导出函数
+"""
 
 def create_fen_batch_stream(
     concurrency,

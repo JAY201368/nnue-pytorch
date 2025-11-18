@@ -1,3 +1,6 @@
+"""
+Python与C++的接口
+"""
 import ctypes
 import os
 import glob
@@ -129,6 +132,9 @@ class CDataLoaderAPI:
         self._define_prototypes()
 
     def _load_library(self):
+        """
+        加载++C动态链接库
+        """
         for lib in glob.glob("./*training_data_loader.*"):
             if not (
                 lib.endswith(".so") or lib.endswith("dll") or lib.endswith(".dylib")
@@ -138,6 +144,9 @@ class CDataLoaderAPI:
         raise FileNotFoundError("Cannot find data_loader shared library.")
 
     def _define_prototypes(self):
+        """
+        C++函数原型定义
+        """
         # EXPORT FenBatchStream* CDECL create_fen_batch_stream(
         #     int concurrency,
         #     int num_files,
@@ -208,7 +217,7 @@ class CDataLoaderAPI:
             ctypes.POINTER(ctypes.c_int),
         ]
 
-
+# 保留两个指针, 指向SparseBatch和FenBatch(用于从流中获取SparseBatch和FenBatch?)
 type SparseBatchPtr = ctypes._Pointer[SparseBatch]
 type FenBatchPtr = ctypes._Pointer[FenBatch]
 

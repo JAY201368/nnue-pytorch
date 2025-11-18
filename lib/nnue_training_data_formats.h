@@ -6530,6 +6530,7 @@ namespace binpack
         };
 
         // NOTE: Order adjusted for this library because originally NO_PIECE had index 0
+        // TODO: 需要修改huffman编码
         constexpr HuffmanedPiece huffman_table[] =
         {
             {0b0001,4}, // PAWN     1

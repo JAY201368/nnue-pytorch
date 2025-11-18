@@ -11,7 +11,7 @@ FILES = 7  # 7列
 NUM_SQ = FILES * RANKS  # 63格
 NUM_PT = 16  # 双方各8种
 NUM_PLANES = NUM_SQ * NUM_PT + 1  # 1009
-NUM_ATTACK_BUCKETS = 6  # 攻击桶数量: 8级
+NUM_ATTACK_BUCKETS = 6  # 攻击桶数量: 6级
 
 
 def orient(
