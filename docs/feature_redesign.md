@@ -1,75 +1,181 @@
-好的，我们先按“静态局面特征”推进，并采用“两层设计”：必选核心块保证尽快跑通，增强块保持模块化、后续可逐块打开。
-我建议第一阶段先定成这个方向：**斗兽棋版不做 king bucket，而以“相对视角的棋子-格子特征”为主干**，沿用原项目的 `InputFeature + ComposedFeatureTransformer` 组合方式。
+# 斗兽棋 NNUE 特征重设计
 
-## 核心特征块
+第一阶段采用静态局面特征，沿用原项目的 `InputFeature + ComposedFeatureTransformer` 框架。特征集默认设计为：
 
-必选块：`JunglePieceSquare`
+```text
+JunglePieceSquare+JunglePieceTerrain
+```
 
-- 棋盘：`7 x 9 = 63` 格。
-- 视角：对黑方视角做 180 度旋转，使“己方兽穴、敌方兽穴、前进方向”在两个视角下语义一致。
-- 棋子平面：`己方/敌方 x 8 种动物 = 16`。
-- 维度：`63 x 16 = 1008`。
-- 单视角最大激活数：最多 16 枚棋子，所以 `MAX_ACTIVE_FEATURES = 16`。
-- 索引建议：
+斗兽棋没有王，因此不沿用国际象棋 `HalfKAv2_hm^` 的 king bucket。当前主干改为“相对视角的棋子-格子特征”，再叠加一个轻量地形泛化块。历史相关规则，例如 7-3、17-5、重复局面和无进展计数，暂不进入网络输入，由规则/数据生成侧处理。
+
+## 坐标与视角
+
+棋盘为 `7 x 9 = 63` 格，内部 square 编号按：
+
+```text
+square = rank * 7 + file
+```
+
+其中 `file` 为 `0..6`，`rank` 为 `0..8`。
+
+网络输入采用 POV 相对视角。白方视角保持原 square，黑方视角做 180 度旋转：
+
+```text
+oriented_square = square                      # white POV
+oriented_square = 62 - square                 # black POV
+```
+
+这样每个 POV 下，己方兽穴总是在 oriented rank 0，敌方兽穴总是在 oriented rank 8。
+
+相对阵营定义为：
+
+```text
+relative_owner = 0  # POV 己方棋子
+relative_owner = 1  # POV 敌方棋子
+```
+
+动物类型顺序固定为：
+
+```text
+0 ELEPHANT
+1 LION
+2 TIGER
+3 PANTHER
+4 WOLF
+5 DOG
+6 CAT
+7 RAT
+```
+
+## `JunglePieceSquare`
+
+路径：`model/modules/features/jungle_piece_square.py`
+
+这是必选核心块，用于表达每枚棋子在 POV 相对棋盘上的位置。
+
+- `FEATURE_NAME = "JunglePieceSquare"`
+- `INPUT_FEATURE_NAME = "JunglePieceSquare"`
+- 棋子平面：`2 x 8 = 16`
+- 输入维度：`63 x 16 = 1008`
+- `MAX_ACTIVE_FEATURES = 16`
+- `NUM_REAL_FEATURES = 1008`
+
+索引公式：
 
 ```text
 index = oriented_square + 63 * (piece_type + 8 * relative_owner)
 ```
 
-这里 `relative_owner = 0` 表示 POV 己方棋子，`1` 表示 POV 敌方棋子。
+PSQT 初始化使用简化子力值：
 
-这个块类似原来的 `HalfKAv2_hm^` 主干，但斗兽棋没有王，所以不做 king bucket。兽穴、陷阱、水域的绝对/相对意义会通过 `oriented_square` 被棋子-格子权重学到。
+```text
+ELEPHANT = 800
+LION     = 700
+TIGER    = 600
+PANTHER  = 500
+WOLF     = 400
+DOG      = 300
+CAT      = 200
+RAT      = 100
+```
 
-## 增强特征块
+POV 己方棋子写入正值，POV 敌方棋子写入负值，并按 `1 / nnue2score` 缩放后填入 PSQT 输出列。
 
-建议预留三个可组合块，但第一版可以只打开第一个或前两个。
+## `JunglePieceTerrain`
 
-`JunglePieceTerrain`
+路径：`model/modules/features/jungle_piece_terrain.py`
 
-这是对 `PieceSquare` 的粗粒度泛化，帮助模型更快学到水、陷阱、兽穴周边的共同规律。
+这是第一阶段的增强块，用于把固定地形与“哪类棋子站在该地形上”绑定。纯地形常量不进入输入，因为斗兽棋棋盘地形固定；只有与棋子绑定后才提供局面信息。
 
-- 类型可定义为：普通陆地、水、己方陷阱、敌方陷阱、己方兽穴邻近、敌方兽穴邻近等。
-- 特征形态：`相对阵营 x 动物类型 x 地形类型`。
-- 注意：纯“地形常量”没有意义，因为棋盘地形固定；必须绑定棋子或局面状态。
+- `FEATURE_NAME = "JunglePieceTerrain"`
+- `INPUT_FEATURE_NAME = "JunglePieceTerrain"`
+- 特征形态：`相对阵营 x 动物类型 x 地形标签`
+- 地形标签数：`8`
+- 输入维度：`2 x 8 x 8 = 128`
+- 每枚棋子最多 3 个地形标签
+- `MAX_ACTIVE_FEATURES = 16 x 3 = 48`
+- `NUM_REAL_FEATURES = 128`
 
-`JungleMobilityAndGoal`
+地形标签顺序：
 
-编码斗兽棋非常重要的“能不能动、离兽穴多近、是否有闯穴威胁”。
+```text
+0 TERRAIN_LAND
+1 TERRAIN_WATER
+2 TERRAIN_OWN_TRAP
+3 TERRAIN_ENEMY_TRAP
+4 TERRAIN_OWN_DEN
+5 TERRAIN_ENEMY_DEN
+6 TERRAIN_OWN_DEN_ADJACENT
+7 TERRAIN_ENEMY_DEN_ADJACENT
+```
 
-可包含：
+地形坐标均以 POV oriented square 表示：
+
+```text
+OWN_DEN          = (file=3, rank=0)
+ENEMY_DEN        = (file=3, rank=8)
+
+OWN_TRAPS        = (2,0), (4,0), (3,1)
+ENEMY_TRAPS      = (2,8), (4,8), (3,7)
+
+WATER            = files 1,2,4,5 x ranks 3,4,5
+```
+
+每个棋子的地形索引：
+
+```text
+plane = piece_type + 8 * relative_owner
+index = 8 * plane + terrain_tag
+```
+
+`JunglePieceTerrain` 的 PSQT 输出列初始化为 0，只让训练学习地形对估值的修正。
+
+## 当前组合维度
+
+当前第一阶段组合：
+
+```text
+JunglePieceSquare+JunglePieceTerrain
+```
+
+组合后：
+
+```text
+NUM_INPUTS          = 1008 + 128 = 1136
+MAX_ACTIVE_FEATURES = 16 + 48   = 64
+NUM_REAL_FEATURES   = 1136
+```
+
+组合顺序很重要。数据编码器必须先输出 `JunglePieceSquare` 的索引块，再输出 `JunglePieceTerrain` 的索引块；第二个块的索引需要按组合特征的偏移量加上 `JunglePieceSquare.NUM_INPUTS`。
+
+## 预留扩展
+
+代码中预留：
+
+```text
+JUNGLE_RESERVED_FEATURES = ("JungleMobilityAndGoal", "JungleThreats")
+```
+
+未来推荐组合：
+
+```text
+JunglePieceSquare+JunglePieceTerrain+JungleMobilityAndGoal+JungleThreats
+```
+
+`JungleMobilityAndGoal` 可编码：
 
 - 每枚棋子的合法步数 bucket。
 - 是否下一步可进入敌方兽穴。
-- 到敌方兽穴的曼哈顿距离 bucket。
+- 到敌方兽穴的距离 bucket。
 - 是否守在己方兽穴/陷阱附近。
 - 狮虎是否有可用跳河。
 - 鼠是否在水中、是否阻挡跳河路径。
 
-`JungleThreats`
-
-对应原项目已有的 `Full_Threats` 思路，但按斗兽棋重写。
-
-可包含：
+`JungleThreats` 可编码：
 
 - 当前是否能吃敌子。
 - 当前是否被敌子可吃。
 - 是否被己方保护。
 - 敌子是否在我方陷阱中。
 - 我方棋子是否在敌方陷阱中。
-- 鼠象特殊克制、水中鼠限制、狮虎跳吃都应由规则侧判定后编码为威胁特征。
-
-## 推荐第一版 Feature Set
-
-我建议第一阶段目标定为：
-
-```text
-JunglePieceSquare+JunglePieceTerrain
-```
-
-然后把威胁与机动性作为第二批打开：
-
-```text
-JunglePieceSquare+JunglePieceTerrain+JungleMobilityAndGoal+JungleThreats
-```
-
-这样既能快速跑通训练管线，又不会把第一版特征设计压得太复杂。历史相关规则，比如 7-3、17-5、重复、无进展，先不进入网络输入，由规则/数据生成侧负责合法性和标签。
+- 鼠象特殊克制、水中鼠限制、狮虎跳吃等规则侧判定结果。
