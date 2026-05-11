@@ -1,8 +1,7 @@
 #include "training_data_loader_internal.h"
 #include "training_data_loader_abi.h"
 
-using namespace binpack;
-using namespace chess;
+using namespace jungle;
 
 // TODO: We might want to introduce some exception safety to the abi.
 // Although for our uses it doesn't have priority.
@@ -20,7 +19,6 @@ NNUE_API SparseBatch* NNUE_CDECL get_sparse_batch_from_fens(const char* feature_
     for (int i = 0; i < num_fens; ++i) {
         auto& e = entries.emplace_back();
         e.pos   = Position::fromFen(fens[i]);
-        movegen::forEachLegalMove(e.pos, [&](Move m) { e.move = m; });
         e.score  = scores[i];
         e.ply    = plies[i];
         e.result = results[i];

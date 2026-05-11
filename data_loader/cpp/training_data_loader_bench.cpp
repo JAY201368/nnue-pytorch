@@ -184,7 +184,7 @@ struct DistributionReport {
         if (!batch) return;
 
         for (int i = 0; i < b_size; ++i) {
-            int pc = batch->entries_copy[i].pos.piecesBB().count();
+            int pc = batch->entries_copy[i].pos.pieceCount();
             int ply = batch->entries_copy[i].ply;
 
             if (pc >= 0 && pc <= 32) {
@@ -240,7 +240,7 @@ void run_report(int concurrency, size_t iteration_count, size_t max_plies, int f
     std::cout << "Initializing stream (Threads: " << concurrency << ", Iterations: " << iteration_count << ")..." << std::endl;
 
     std::unique_ptr<SparseBatchStream, SparseBatchStreamDeleter> stream(
-        create_sparse_batch_stream("Full_Threats+HalfKAv2_hm", concurrency, file_count, files,
+        create_sparse_batch_stream("JunglePieceSquare+JunglePieceTerrain", concurrency, file_count, files,
             batch_size, cyclic, skip_config, ddp_config));
 
     DistributionReport report(max_plies);
@@ -339,7 +339,7 @@ void run_bench(int concurrency, size_t iteration_count, int do_cache_files, int 
     }
 
     std::unique_ptr<SparseBatchStream, SparseBatchStreamDeleter> stream(
-        create_sparse_batch_stream("Full_Threats+HalfKAv2_hm", concurrency, file_count, files,
+        create_sparse_batch_stream("JunglePieceSquare+JunglePieceTerrain", concurrency, file_count, files,
             batch_size, cyclic, skip_config, ddp_config));
 
     size_t warmup_iterations = 5;

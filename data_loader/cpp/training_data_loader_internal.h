@@ -13,7 +13,7 @@
 #include <string_view>
 #include <utility>
 
-#include "lib/nnue_training_data_formats.h"
+#include "lib/jungle_types.h"
 #include "lib/nnue_training_data_stream.h"
 #include "training_data_loader_structs.h"
 
@@ -21,21 +21,21 @@ struct IFeatureExtractor {
     virtual ~IFeatureExtractor() = default;
     virtual int inputs() const = 0;
     virtual int max_active_features() const = 0;
-    virtual std::pair<int, int> fill_features_sparse(const struct binpack::TrainingDataEntry& e,
+    virtual std::pair<int, int> fill_features_sparse(const struct jungle::TrainingDataEntry& e,
                                                      int* features,
                                                      float* values,
-                                                     chess::Color color) const = 0;
+                                                     jungle::Color color) const = 0;
 };
 
 std::shared_ptr<IFeatureExtractor> get_feature(std::string_view name);
-std::function<bool(const struct binpack::TrainingDataEntry&)> make_skip_predicate(DataloaderSkipConfig config);
+std::function<bool(const struct jungle::TrainingDataEntry&)> make_skip_predicate(DataloaderSkipConfig config);
 
 struct SparseBatch final {
     static constexpr bool IS_BATCH = true;
 
     SparseBatch(
         const IFeatureExtractor& feature_set,
-        const std::vector<struct binpack::TrainingDataEntry>& entries);
+        const std::vector<struct jungle::TrainingDataEntry>& entries);
     ~SparseBatch();
 
     int num_inputs;
@@ -55,12 +55,12 @@ struct SparseBatch final {
     int* layer_stack_indices;
 
 #ifdef NNUE_LOADER_STATISTICS
-    std::vector<struct binpack::TrainingDataEntry> entries_copy;
+    std::vector<struct jungle::TrainingDataEntry> entries_copy;
 #endif
 
 private:
-    void fill_entry(const IFeatureExtractor& fs, int i, const struct binpack::TrainingDataEntry& e);
-    void fill_features(const IFeatureExtractor& fs, int i, const struct binpack::TrainingDataEntry& e);
+    void fill_entry(const IFeatureExtractor& fs, int i, const struct jungle::TrainingDataEntry& e);
+    void fill_features(const IFeatureExtractor& fs, int i, const struct jungle::TrainingDataEntry& e);
 };
 
 struct AnyStream {
@@ -74,7 +74,7 @@ struct Stream: AnyStream {
     Stream(int concurrency,
            const std::vector<std::string>& filenames,
            bool cyclic,
-           std::function<bool(const struct binpack::TrainingDataEntry&)> skipPredicate,
+           std::function<bool(const struct jungle::TrainingDataEntry&)> skipPredicate,
            int rank = 0,
            int world_size = 1) :
         m_stream(training_data::open_sfen_input_file_parallel(
@@ -95,7 +95,7 @@ struct FeaturedBatchStream: Stream<SparseBatch> {
                         const std::vector<std::string>& filenames,
                         int batch_size,
                         bool cyclic,
-                        std::function<bool(const struct binpack::TrainingDataEntry&)> skipPredicate,
+                        std::function<bool(const struct jungle::TrainingDataEntry&)> skipPredicate,
                         int rank = 0,
                         int world_size = 1);
     ~FeaturedBatchStream() final;
@@ -130,7 +130,7 @@ private:
 };
 
 struct FenBatch final {
-    FenBatch(const std::vector<struct binpack::TrainingDataEntry>& entries);
+    FenBatch(const std::vector<struct jungle::TrainingDataEntry>& entries);
     ~FenBatch();
 
 private:
@@ -146,7 +146,7 @@ struct FenBatchStream: Stream<FenBatch> {
                    const std::vector<std::string>& filenames,
                    int batch_size,
                    bool cyclic,
-                   std::function<bool(const struct binpack::TrainingDataEntry&)> skipPredicate,
+                   std::function<bool(const struct jungle::TrainingDataEntry&)> skipPredicate,
                    int rank = 0,
                    int world_size = 1);
     ~FenBatchStream() final;
