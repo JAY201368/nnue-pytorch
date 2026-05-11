@@ -12,3 +12,4 @@ tyro
 ruff
 ranger21
 schedulefree
+pytest

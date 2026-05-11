@@ -6,14 +6,20 @@ from .composed import ComposedFeatureTransformer, combine_input_features
 from .full_threats import FullThreats
 from .halfka_v2_hm import HalfKav2Hm
 from .input_feature import InputFeature
+from .jungle_piece_square import JunglePieceSquare
+from .jungle_piece_terrain import JunglePieceTerrain
 
 import tyro
 from typing import Annotated
 
+JUNGLE_BASE_FEATURE_SET = "JunglePieceSquare+JunglePieceTerrain"
+JUNGLE_RESERVED_FEATURES = ("JungleMobilityAndGoal", "JungleThreats")
 
 _FEATURE_COMPONENTS: dict[str, type[InputFeature]] = {
     "HalfKAv2_hm^": HalfKav2Hm,
     "Full_Threats": FullThreats,
+    "JunglePieceSquare": JunglePieceSquare,
+    "JunglePieceTerrain": JunglePieceTerrain,
 }
 
 
@@ -34,7 +40,8 @@ class FeatureConfig:
         tyro.conf.arg(
             help="The feature set to use. Available: "
             + ", ".join(get_available_features())
-            + ". Combine with +, e.g. Full_Threats+HalfKAv2_hm^"
+            + ". Combine with +, e.g. Full_Threats+HalfKAv2_hm^ or "
+            + JUNGLE_BASE_FEATURE_SET
         ),
     ] = "Full_Threats+HalfKAv2_hm^"
 
@@ -46,7 +53,8 @@ def add_feature_args(parser: argparse.ArgumentParser) -> None:
         default="Full_Threats+HalfKAv2_hm^",
         help="The feature set to use. Available: "
         + ", ".join(get_available_features())
-        + ". Combine with +, e.g. Full_Threats+HalfKAv2_hm^",
+        + ". Combine with +, e.g. Full_Threats+HalfKAv2_hm^ or "
+        + JUNGLE_BASE_FEATURE_SET,
     )
 
 
@@ -55,9 +63,13 @@ __all__ = [
     "combine_input_features",
     "HalfKav2Hm",
     "FullThreats",
+    "JunglePieceSquare",
+    "JunglePieceTerrain",
     "InputFeature",
     "get_feature_cls",
     "get_available_features",
     "add_feature_args",
     "FeatureConfig",
+    "JUNGLE_BASE_FEATURE_SET",
+    "JUNGLE_RESERVED_FEATURES",
 ]
